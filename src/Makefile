@@ -9,12 +9,10 @@ debug: TARGET
 
 TARGET: netstore-server netstore-client
 
-netstore-server.o netstore-client.o err.o: err.h
-
-netstore-server: netstore-server.o err.o
+netstore-server: netstore-server.o
 	$(CC) $(LFLAGS) $^ -o $@
 
-netstore-client: netstore-client.o err.o
+netstore-client: netstore-client.o
 	$(CC) $(LFLAGS) $^ -o $@
 
 .PHONY: clean TARGET
