@@ -266,7 +266,7 @@ gdzie:
 
 &nbsp;&nbsp;&nbsp;&nbsp;`{ip_serwera}` to adres jednostkowy serwera;
 
-&nbsp;&nbsp;&nbsp;&nbsp;`{port_serwera}` to port TCP serwera użyty do pobrania pliku.
+&nbsp;&nbsp;&nbsp;&nbsp;`{port_serwera}` to port `TCP` serwera użyty do pobrania pliku.
 
 Jeśli wysyłanie pliku nie powiedzie się, to klient powinien wypisać na standardowe wyjście komunikat o błędzie w fomacie:
 ```
@@ -376,3 +376,5 @@ Za każde rozpoczęte `12` godzin spóźnienia odejmujemy `3p`.
 Rozwiązanie dostarczone w `I` terminie można poprawić jednokrotnie w `II` terminie.
 
 W `II` terminie nie odejmuje się punktów za spóźnienia. Rozwiązania z datą późniejszą niż `7` dni przed egzaminem poprawkowym nie podlegają ocenie.
+
+## Q&A
