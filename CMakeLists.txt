@@ -4,7 +4,7 @@ project (netstore-2 CXX)
 find_package ( Threads REQUIRED )
 
 #set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_FLAGS "-g -Wall -Wextra -O2 -std=c++17")
+set(CMAKE_CXX_FLAGS "-g -Wall -Wextra -O2 -std=c++17 -l stdc++fs")
 
 # http://stackoverflow.com/questions/10555706/
 macro (add_executable _name)
