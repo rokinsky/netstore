@@ -25,24 +25,44 @@ int main(int ac, char** av) {
   std::string SHRD_FLDR;
   int64_t TIMEOUT;
 
-
   bpo::options_description desc("Allowed options");
   desc.add_options()
-      ("help", "produce help message")
-      (",g", bpo::value<std::string>(&MCAST_ADDR)->required(), "Multicast address")
-      (",p", bpo::value<int64_t>(&CMD_PORT)->required()->notifier
-          (boost::bind(&check_range<int64_t >, _1, 0, std::numeric_limits<uint16_t>::max(), "p")), "UDP port")
-      (",b", bpo::value<int64_t>(&MAX_SPACE)->default_value(52428800)->notifier
-          (boost::bind(&check_range<int64_t >, _1, 0, std::numeric_limits<int64_t>::max(), "b")), "Allowed space")
-      (",f", bpo::value<std::string>(&SHRD_FLDR)->required()->notifier(
+      (",g",
+       bpo::value(&MCAST_ADDR)
+         ->required(),
+       "Multicast address")
+      (",p",
+       bpo::value(&CMD_PORT)
+         ->required()
+         ->notifier(
+           boost::bind(&check_range<int64_t>, _1, 0, std::numeric_limits<uint16_t>::max(), "p")
+         ),
+       "UDP port")
+      (",b",
+       bpo::value(&MAX_SPACE)
+         ->default_value(52428800)
+         ->notifier(
+           boost::bind(&check_range<int64_t>, _1, 0, std::numeric_limits<int64_t>::max(), "b")
+         ),
+       "Allowed space")
+      (",f",
+       bpo::value(&SHRD_FLDR)
+         ->required()
+         ->notifier(
           [] (const std::string& s) {
             if (not std::filesystem::is_directory(s))
               throw bpo::validation_error(
                   bpo::validation_error::invalid_option_value, "f", s
               );
-          }), "Shared folder")
-      (",t", bpo::value<int64_t>(&TIMEOUT)->default_value(5)->notifier
-          (boost::bind(&check_range<int64_t >, _1, 0, 300, "t")), "Timeout")
+         }),
+       "Shared folder")
+      (",t",
+       bpo::value(&TIMEOUT)
+         ->default_value(5)
+         ->notifier(
+           boost::bind(&check_range<int64_t>, _1, 0, 300, "t")
+         ),
+       "Timeout")
       ;
 
   try {
@@ -51,7 +71,6 @@ int main(int ac, char** av) {
     notify(vm);
 
     std::cout << MCAST_ADDR << " " << CMD_PORT << std::endl;
-
   } catch (...) {
     std::cerr << boost::current_exception_diagnostic_information() << std::endl;
   }
