@@ -7,6 +7,30 @@
 #include <iostream>
 #include <filesystem>
 
+class server {
+ public:
+  server(std::string ma, uint16_t cp, int64_t ms, std::string sf, uint8_t t) :
+    MCAST_ADDR(std::move(ma)),
+    CMD_PORT(cp),
+    MAX_SPACE(ms),
+    SHRD_FLDR(std::move(sf)),
+    TIMEOUT(t)
+  {}
+
+  void connect();
+
+ private:
+  std::string MCAST_ADDR;
+  uint16_t CMD_PORT;
+  int64_t MAX_SPACE;
+  std::string SHRD_FLDR;
+  uint8_t TIMEOUT;
+};
+
+void server::connect() {
+
+}
+
 template<typename T>
 void check_range(const T& value, const T& min, const T& max, const std::string& param) {
   namespace bpo = boost::program_options;
@@ -70,6 +94,8 @@ int main(int ac, char** av) {
     store(bpo::parse_command_line(ac, av, desc), vm);
     notify(vm);
 
+    server s(MCAST_ADDR, CMD_PORT, MAX_SPACE, SHRD_FLDR, TIMEOUT);
+    s.connect();
     std::cout << MCAST_ADDR << " " << CMD_PORT << std::endl;
   } catch (...) {
     std::cerr << boost::current_exception_diagnostic_information() << std::endl;
