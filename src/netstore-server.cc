@@ -6,6 +6,7 @@
 #include <boost/bind.hpp>
 #include <iostream>
 #include <filesystem>
+#include "helper.hh"
 
 class server {
  public:
