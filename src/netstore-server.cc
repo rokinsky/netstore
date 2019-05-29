@@ -6,7 +6,14 @@
 #include <boost/bind.hpp>
 #include <iostream>
 #include <filesystem>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include "helper.hh"
+#include <unistd.h>
+
+#define BSIZE         1024
+#define REPEAT_COUNT  30
 
 class server {
  public:
@@ -15,22 +22,96 @@ class server {
     CMD_PORT(cp),
     MAX_SPACE(ms),
     SHRD_FLDR(std::move(sf)),
-    TIMEOUT(t)
+    TIMEOUT(t),
+    sock(0),
+    ip_mreq({})
   {}
 
   void connect();
 
+  void run();
+
+  ~server() {
+    leave_multicast();
+    close();
+  }
+
  private:
   std::string MCAST_ADDR;
-  uint16_t CMD_PORT;
+  in_port_t CMD_PORT;
   int64_t MAX_SPACE;
   std::string SHRD_FLDR;
   uint8_t TIMEOUT;
+  int sock;
+  struct ip_mreq ip_mreq;
+  void open_socket() {
+    sock = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sock < 0)
+      throw std::runtime_error("open_socket");
+  }
+
+  void join_multicast() {
+    ip_mreq.imr_interface.s_addr = htonl(INADDR_ANY);
+    if (inet_aton(MCAST_ADDR.c_str(), &ip_mreq.imr_multiaddr) == 0)
+      throw std::runtime_error("inet_aton");
+    if (setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (void*)&ip_mreq, sizeof ip_mreq) < 0)
+      throw std::runtime_error("setsockopt");
+  }
+
+  void bind_local() {
+    struct sockaddr_in local_address = {};
+    local_address.sin_family = AF_INET;
+    local_address.sin_addr.s_addr = htonl(INADDR_ANY);
+    local_address.sin_port = htons(CMD_PORT);
+    if (bind(sock, (struct sockaddr *)&local_address, sizeof local_address) < 0)
+      throw std::runtime_error("bind");
+  }
+
+  void close() {
+    ::close(sock);
+  }
+
+  void leave_multicast() {
+    if (setsockopt(sock, IPPROTO_IP, IP_DROP_MEMBERSHIP, (void*)&ip_mreq, sizeof ip_mreq) < 0)
+      throw std::runtime_error("setsockopt");
+  }
 };
 
 void server::connect() {
-
+  open_socket();
+  join_multicast();
+  bind_local();
 }
+
+void server::run() {
+  /* czytanie tego, co odebrano */
+  char buffer[BSIZE];
+  ssize_t rcv_len;
+  time_t time_buffer;
+  unsigned int remote_len;
+  struct sockaddr_in remote_address({});
+  for (auto i = 0; i < REPEAT_COUNT; ++i) {
+    bzero(buffer, BSIZE);
+    rcv_len = recvfrom(sock, buffer, sizeof(buffer), 0, (struct sockaddr*) &remote_address, &remote_len);
+    if (rcv_len < 0)
+      throw std::runtime_error("read");
+    else {
+      printf("read %zd bytes: %.*s\n", rcv_len, (int)rcv_len, buffer);
+      time(&time_buffer);
+      if (strcmp(buffer, "GET_TIME") == 0) {
+        strncpy(buffer, ctime(&time_buffer), BSIZE);
+        if (sendto(sock, buffer, sizeof(buffer), 0, (struct sockaddr*) &remote_address, remote_len) == -1) {
+          throw std::runtime_error("sendto");
+        } else {
+          std::cout << "Sent time: " << buffer << std::endl;
+        }
+      } else {
+        std::cout << "Received unexpected bytes." << std::endl;
+      }
+    }
+  }
+}
+
 
 template<typename T>
 void check_range(const T& value, const T& min, const T& max, const std::string& param) {
@@ -98,6 +179,7 @@ int main(int ac, char** av) {
     server s(MCAST_ADDR, CMD_PORT, MAX_SPACE, SHRD_FLDR, TIMEOUT);
     s.connect();
     std::cout << MCAST_ADDR << " " << CMD_PORT << std::endl;
+    s.run();
   } catch (...) {
     std::cerr << boost::current_exception_diagnostic_information() << std::endl;
   }
