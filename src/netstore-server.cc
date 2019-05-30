@@ -17,17 +17,21 @@
 #define BSIZE         1024
 #define REPEAT_COUNT  30
 
+namespace netstore {
+
 class server {
  public:
   server(std::string ma, uint16_t cp, int64_t ms, std::string sf, uint8_t t) :
-    MCAST_ADDR(std::move(ma)),
-    CMD_PORT(cp),
-    MAX_SPACE(ms),
-    SHRD_FLDR(std::move(sf)),
-    TIMEOUT(t),
-    sock(0),
-    ip_mreq({})
-  {}
+      MCAST_ADDR(std::move(ma)),
+      CMD_PORT(cp),
+      MAX_SPACE(ms),
+      SHRD_FLDR(std::move(sf)),
+      TIMEOUT(t),
+      sock(0),
+      ip_mreq({}) {
+    available_space = std::max<int64_t>(0, MAX_SPACE - index_files());
+    std::cout << "available space: " << available_space << std::endl;
+  }
 
   void connect();
 
@@ -43,21 +47,55 @@ class server {
   in_port_t CMD_PORT;
   int64_t MAX_SPACE;
   std::string SHRD_FLDR;
+  uint64_t available_space;
   uint8_t TIMEOUT;
   int sock;
   struct ip_mreq ip_mreq;
+
+  std::unordered_map<std::string, uint64_t> files;
+
+  void hello(struct sockaddr_in& target, uint64_t cmd_seq);
+  void list();
+  void get();
+  void del();
+  void add();
+
+  uint64_t index_files() {
+    namespace fs = std::filesystem;
+    uint64_t total_size = 0;
+    for (auto& p: fs::directory_iterator(SHRD_FLDR)) {
+      if (p.is_regular_file()) {
+        files[p.path().filename().string()] = p.file_size();
+        total_size += p.file_size();
+        std::cout << p.path().filename().string() << "(" << p.file_size() << ")" << '\n';
+      }
+    }
+    std::cout << "total size: " << total_size << std::endl;
+    return total_size;
+  }
+
+  ssize_t read_cmd(cmd::simple& cmd, struct sockaddr_in& remote, socklen_t& remote_len) {
+    remote_len = sizeof(struct sockaddr_in); /* WARNING !!! */
+    ssize_t rcv_len = recvfrom(sock, &cmd, sizeof(cmd::simple), 0,
+                       (struct sockaddr *) &remote, &remote_len);
+    if (rcv_len < 0)
+      throw exception("read");
+    return rcv_len;
+  }
+
   void open_socket() {
     sock = socket(AF_INET, SOCK_DGRAM, 0);
     if (sock < 0)
-      throw std::runtime_error(std::string("open_socket") + " " + std::strerror(errno));
+      throw exception("open_socket");
   }
 
   void join_multicast() {
     ip_mreq.imr_interface.s_addr = htonl(INADDR_ANY);
     if (inet_aton(MCAST_ADDR.c_str(), &ip_mreq.imr_multiaddr) == 0)
-      throw std::runtime_error("inet_aton");
-    if (setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (void*)&ip_mreq, sizeof ip_mreq) < 0)
-      throw std::runtime_error(std::string("setsockopt") + " " + std::strerror(errno));
+      throw exception("inet_aton");
+    if (setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (void *) &ip_mreq,
+                   sizeof ip_mreq) < 0)
+      throw exception("setsockopt");
   }
 
   void bind_local() {
@@ -65,8 +103,8 @@ class server {
     local_address.sin_family = AF_INET;
     local_address.sin_addr.s_addr = htonl(INADDR_ANY);
     local_address.sin_port = htons(CMD_PORT);
-    if (bind(sock, (struct sockaddr *)&local_address, sizeof local_address) < 0)
-      throw std::runtime_error(std::string("bind") + " " + std::strerror(errno));
+    if (bind(sock, (struct sockaddr *) &local_address, sizeof local_address) < 0)
+      throw exception("bind");
   }
 
   void close() {
@@ -74,8 +112,9 @@ class server {
   }
 
   void leave_multicast() {
-    if (setsockopt(sock, IPPROTO_IP, IP_DROP_MEMBERSHIP, (void*)&ip_mreq, sizeof ip_mreq) < 0)
-      throw std::runtime_error(std::string("setsockopt") + " " + std::strerror(errno));
+    if (setsockopt(sock, IPPROTO_IP, IP_DROP_MEMBERSHIP, (void *) &ip_mreq,
+                   sizeof ip_mreq) < 0)
+      throw exception("setsockopt");
   }
 };
 
@@ -85,48 +124,58 @@ void server::connect() {
   bind_local();
 }
 
-void server::run() {
-  char buffer[BSIZE];
-  ssize_t rcv_len;
+void server::hello(struct sockaddr_in& ra, uint64_t cmd_seq) {
+/*  cmd::complex complex(cmd::good_day, cmd_seq, available_space, MCAST_ADDR.c_str());
+
   time_t time_buffer;
-  struct sockaddr_in remote_address({});
-  for (auto i = 0; i < REPEAT_COUNT; ++i) {
-    bzero(buffer, BSIZE);
-    std::cout << "sizeof simple " << sizeof(netstore::cmd::simple) << std::endl;
-    netstore::cmd::simple simple{};
-    socklen_t remote_len = sizeof(struct sockaddr_in); /* WARNING !!! */
-    rcv_len = recvfrom(sock, &simple, sizeof(netstore::cmd::simple), 0, (struct sockaddr*) &remote_address, &remote_len);
-    if (rcv_len < 0)
-      throw std::runtime_error(std::string("read") + " " + std::strerror(errno));
-    else {
-      printf("address: %s %d\n", inet_ntoa(remote_address.sin_addr), ntohs(remote_address.sin_port));
-      printf("read %zd bytes: %s, seq: %lu\n", rcv_len, simple.cmd, be64toh(simple.cmd_seq));
-      printf("read data %s\n", simple.data);
-      if (strncmp(simple.cmd, "GET_TIME", 10) == 0) {
-        bzero(buffer, BSIZE);
-        time(&time_buffer);
-        strncpy(buffer, ctime(&time_buffer), BSIZE);
-        if (sendto(sock, buffer, sizeof(buffer), 0, (struct sockaddr*) &remote_address, remote_len) == -1) {
-          throw std::runtime_error(std::string("sendto") + " " + std::strerror(errno));
-        } else {
-          std::cout << "Sent time: " << buffer << std::endl;
-        }
-      } else {
-        std::cout << "Received unexpected bytes." << std::endl;
-      }
-    }
+  char buffer[BSIZE];
+  bzero(buffer, BSIZE);
+  time(&time_buffer);
+  strncpy(buffer, ctime(&time_buffer), BSIZE);
+  printf("address: %s %d\n", inet_ntoa(target->sin_addr),
+         ntohs(target->sin_port));
+  std::cout << "hello send: " << complex.to_string() << std::endl;
+
+  if (sendto(sock, buffer, sizeof(buffer), 0,
+             (struct sockaddr *) &target, sizeof(*target)) != complex.size()) {
+    throw exception("sendto");
+  }*/
+
+  cmd::complex complex(cmd::good_day, cmd_seq, available_space, MCAST_ADDR.c_str());
+  if (sendto(sock, (char *) &complex, complex.size(), 0,
+             (struct sockaddr *) &ra, sizeof(ra)) != -1) {
+    throw exception("sendto");
   }
 }
 
+void server::run() {
+  for (auto i = 0; i < REPEAT_COUNT; ++i) {
+    cmd::simple simple;
+    struct sockaddr_in remote_address{};
+    socklen_t remote_len;
+    ssize_t rcv_len = read_cmd(simple, remote_address, remote_len);
 
-template<typename T>
-void check_range(const T& value, const T& min, const T& max, const std::string& param) {
-  namespace bpo = boost::program_options;
-  if (value < min || value > max) {
-    throw bpo::validation_error(
-        bpo::validation_error::invalid_option_value, param, std::to_string(value)
-    );
+    printf("address: %s %d\n", inet_ntoa(remote_address.sin_addr),
+           ntohs(remote_address.sin_port));
+    printf("read %zd bytes: %s, seq: %lu\n", rcv_len, simple.cmd,
+           be64toh(simple.cmd_seq));
+    printf("read data %s\n", simple.data);
+
+    if (cmd::eq(simple.cmd, cmd::hello) && simple.is_empty_data()) {
+      hello(remote_address, be64toh(simple.cmd_seq));
+    } else if (cmd::eq(simple.cmd, cmd::list)) {
+
+    } else if (cmd::eq(simple.cmd, cmd::get)) {
+
+    } else if (cmd::eq(simple.cmd, cmd::del)) {
+
+    } else if (cmd::eq(simple.cmd, cmd::add)) {
+      cmd::complex complex(&simple);
+    } else {
+      std::cout << "Received unexpected bytes." << std::endl;
+    }
   }
+}
 }
 
 int main(int ac, char** av) {
@@ -139,54 +188,26 @@ int main(int ac, char** av) {
 
   bpo::options_description desc("Allowed options");
   desc.add_options()
-      (",g",
-       bpo::value(&MCAST_ADDR)
-         ->required(),
-       "Multicast address")
-      (",p",
-       bpo::value(&CMD_PORT)
-         ->required()
-         ->notifier(
-           boost::bind(&check_range<int64_t>, _1, 0, std::numeric_limits<uint16_t>::max(), "p")
-         ),
-       "UDP port")
-      (",b",
-       bpo::value(&MAX_SPACE)
-         ->default_value(52428800)
-         ->notifier(
-           boost::bind(&check_range<int64_t>, _1, 0, std::numeric_limits<int64_t>::max(), "b")
-         ),
-       "Allowed space")
-      (",f",
-       bpo::value(&SHRD_FLDR)
-         ->required()
-         ->notifier(
-          [] (const std::string& s) {
-            if (not std::filesystem::is_directory(s))
-              throw bpo::validation_error(
-                  bpo::validation_error::invalid_option_value, "f", s
-              );
-         }),
-       "Shared folder")
-      (",t",
-       bpo::value(&TIMEOUT)
-         ->default_value(5)
-         ->notifier(
-           boost::bind(&check_range<int64_t>, _1, 0, 300, "t")
-         ),
-       "Timeout")
-      ;
+  (",g", bpo::value(&MCAST_ADDR)->required(), "Multicast address")
+  (",p", bpo::value(&CMD_PORT)->required()->notifier(
+       boost::bind(&netstore::aux::check_range<int64_t>, _1, 0, std::numeric_limits<uint16_t>::max(), "p")), "UDP port")
+  (",b", bpo::value(&MAX_SPACE)->default_value(52428800)->notifier(
+       boost::bind(&netstore::aux::check_range<int64_t>, _1, 0, std::numeric_limits<int64_t>::max(), "b")), "Allowed space")
+  (",f", bpo::value(&SHRD_FLDR)->required()->notifier(boost::bind(&netstore::aux::check_dir, _1)),"Shared folder")
+  (",t", bpo::value(&TIMEOUT)->default_value(5)->notifier(boost::bind(&netstore::aux::check_range<int64_t>, _1, 0, 300, "t")), "Timeout")
+  ;
 
   try {
     bpo::variables_map vm;
     store(bpo::parse_command_line(ac, av, desc), vm);
     notify(vm);
 
-    server s(MCAST_ADDR, CMD_PORT, MAX_SPACE, SHRD_FLDR, TIMEOUT);
+    netstore::server s(MCAST_ADDR, CMD_PORT, MAX_SPACE, SHRD_FLDR, TIMEOUT);
     s.connect();
     std::cout << MCAST_ADDR << " " << CMD_PORT << std::endl;
     s.run();
   } catch (...) {
     std::cerr << boost::current_exception_diagnostic_information() << std::endl;
+    exit(EXIT_FAILURE);
   }
 }

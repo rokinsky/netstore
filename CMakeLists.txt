@@ -15,7 +15,7 @@ macro (add_executable _name)
     # invoke built-in add_executable
     _add_executable(${ARGV})
     if (TARGET ${_name})
-        target_link_libraries(${_name} ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES} stdc++fs proto ${PROTOBUF_LIBRARY})
+        target_link_libraries(${_name} ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES} stdc++fs)
     endif()
 endmacro()
 

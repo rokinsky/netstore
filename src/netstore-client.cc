@@ -12,7 +12,6 @@
 #include <fstream>
 #include <iostream>
 
-#include "Command.pb.h"
 #include "helper.hh"
 
 #define BSIZE         256
@@ -20,29 +19,7 @@
 #define REPEAT_COUNT  3
 #define SLEEP_TIME    5
 
-/*namespace netstore::cmd {
-  class simple {
-    friend class boost::serialization::access;
-
-    template<class Archive>
-    void serialize(Archive & ar, const unsigned int version) {
-      ar & cmd;
-      ar & cmd_seq;
-      ar & data;
-    }
-    std::string cmd;
-    uint64_t cmd_seq;
-    std::string data;
-   public:
-    simple() = default;
-    simple(std::string cmd, uint64_t cmd_seq, const std::string& data)
-        : cmd(std::move(cmd))
-        , cmd_seq(cmd_seq)
-        , data(data)
-    {}
-  };
-}*/ // namespace netstore::cmd
-
+namespace netstore {
 class client {
  public:
    client(std::string address, in_port_t port)
@@ -67,6 +44,30 @@ class client {
   void set_target();
   void set_timeout();
   void close();
+
+  void hello() {
+    unsigned int remote_len;
+    ssize_t rcv_len;
+    printf("Sending request...\n");
+    char buffer[BSIZE];
+    bzero(buffer, BSIZE);
+    cmd::simple simple { cmd::hello, htobe64(10) };
+
+    if (sendto(sock, &simple, simple.size(), 0, (struct sockaddr*) &remote_address, sizeof(remote_address)) != simple.size())
+      throw std::runtime_error("write");
+
+    printf("Waiting for response...\n");
+
+    cmd::complex complex;
+    rcv_len = recvfrom(sock, &complex, sizeof(complex), 0, (struct sockaddr*) &remote_address, &remote_len);
+    if (rcv_len < 0) {
+      printf("Didn't get any response. Repeating request.\n");
+    } else {
+      //printf("Time: %.*s\n", (int)rcv_len, buffer);
+      std::cout << complex.to_string() << std::endl;
+    }
+  }
+
   std::string remote_dotted_address;
   in_port_t remote_port;
   int sock;
@@ -83,52 +84,13 @@ void client::connect() {
 }
 
 void client::run() {
-  unsigned int remote_len;
-  ssize_t rcv_len;
+
 
   for (auto i = 0; i < REPEAT_COUNT; ++i) {
-    printf("Sending request...\n");
-    // DEFAULT
-      char buffer[BSIZE];
-    //  size_t length;
-     bzero(buffer, BSIZE);
-    // strncpy(buffer, "GET_TIME", BSIZE);
-    // length = strnlen(buffer, BSIZE);
-
-    /* PROTO
-    netstore::commands::Simple simple;
-    simple.set_cmd("HELLO");
-    simple.set_cmd_seq(1);
-
-    size_t length = simple.ByteSize();
-    char buffer[length];
-    simple.SerializeToArray(buffer, length);
-    */
-
-    // MY
-    uint64_t x = 10;
-    //std::string y("GET_TIME" + std::to_s);
-
-    netstore::cmd::simple simple {"GET_TIME", htobe64(x), ""};
-    simple.set_data("data1");
-
-    if (sendto(sock, &simple, simple.size(), 0, (struct sockaddr*) &remote_address, sizeof(remote_address)) != simple.size())
-      throw std::runtime_error("write");
-
-    printf("Waiting for response...\n");
-    rcv_len = recvfrom(sock, buffer, sizeof(buffer), 0, (struct sockaddr*) &remote_address, &remote_len);
-    if (rcv_len < 0) {
-      if (i == 2) {
-        printf("Closing.\n");
-        close();
-        exit(1);
-      }
-      printf("Didn't get any response. Repeating request.\n");
-    } else {
-      printf("Time: %.*s\n", (int)rcv_len, buffer);
-      break;
-    }
+    hello();
   }
+  printf("Closing.\n");
+  close();
 }
 
 void client::open_socket() {
@@ -175,11 +137,12 @@ void client::set_timeout() {
 void client::close() {
   ::close(sock);
 }
+}
 
 int main(int ac, char** av) {
   namespace bpo = boost::program_options;
 
-  client c(av[1], (in_port_t)atoi(av[2]));
+  netstore::client c(av[1], (in_port_t)atoi(av[2]));
   c.connect();
   c.run();
 
