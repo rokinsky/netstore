@@ -12,6 +12,8 @@
 #include "helper.hh"
 #include <unistd.h>
 
+
+#define MAX_UDP 65507
 #define BSIZE         1024
 #define REPEAT_COUNT  30
 
@@ -47,7 +49,7 @@ class server {
   void open_socket() {
     sock = socket(AF_INET, SOCK_DGRAM, 0);
     if (sock < 0)
-      throw std::runtime_error("open_socket");
+      throw std::runtime_error(std::string("open_socket") + " " + std::strerror(errno));
   }
 
   void join_multicast() {
@@ -55,7 +57,7 @@ class server {
     if (inet_aton(MCAST_ADDR.c_str(), &ip_mreq.imr_multiaddr) == 0)
       throw std::runtime_error("inet_aton");
     if (setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (void*)&ip_mreq, sizeof ip_mreq) < 0)
-      throw std::runtime_error("setsockopt");
+      throw std::runtime_error(std::string("setsockopt") + " " + std::strerror(errno));
   }
 
   void bind_local() {
@@ -64,7 +66,7 @@ class server {
     local_address.sin_addr.s_addr = htonl(INADDR_ANY);
     local_address.sin_port = htons(CMD_PORT);
     if (bind(sock, (struct sockaddr *)&local_address, sizeof local_address) < 0)
-      throw std::runtime_error("bind");
+      throw std::runtime_error(std::string("bind") + " " + std::strerror(errno));
   }
 
   void close() {
@@ -73,7 +75,7 @@ class server {
 
   void leave_multicast() {
     if (setsockopt(sock, IPPROTO_IP, IP_DROP_MEMBERSHIP, (void*)&ip_mreq, sizeof ip_mreq) < 0)
-      throw std::runtime_error("setsockopt");
+      throw std::runtime_error(std::string("setsockopt") + " " + std::strerror(errno));
   }
 };
 
@@ -84,24 +86,28 @@ void server::connect() {
 }
 
 void server::run() {
-  /* czytanie tego, co odebrano */
   char buffer[BSIZE];
   ssize_t rcv_len;
   time_t time_buffer;
-  unsigned int remote_len;
   struct sockaddr_in remote_address({});
   for (auto i = 0; i < REPEAT_COUNT; ++i) {
     bzero(buffer, BSIZE);
-    rcv_len = recvfrom(sock, buffer, sizeof(buffer), 0, (struct sockaddr*) &remote_address, &remote_len);
+    std::cout << "sizeof simple " << sizeof(netstore::cmd::simple) << std::endl;
+    netstore::cmd::simple simple{};
+    socklen_t remote_len = sizeof(struct sockaddr_in); /* WARNING !!! */
+    rcv_len = recvfrom(sock, &simple, sizeof(netstore::cmd::simple), 0, (struct sockaddr*) &remote_address, &remote_len);
     if (rcv_len < 0)
-      throw std::runtime_error("read");
+      throw std::runtime_error(std::string("read") + " " + std::strerror(errno));
     else {
-      printf("read %zd bytes: %.*s\n", rcv_len, (int)rcv_len, buffer);
-      time(&time_buffer);
-      if (strcmp(buffer, "GET_TIME") == 0) {
+      printf("address: %s %d\n", inet_ntoa(remote_address.sin_addr), ntohs(remote_address.sin_port));
+      printf("read %zd bytes: %s, seq: %lu\n", rcv_len, simple.cmd, be64toh(simple.cmd_seq));
+      printf("read data %s\n", simple.data);
+      if (strncmp(simple.cmd, "GET_TIME", 10) == 0) {
+        bzero(buffer, BSIZE);
+        time(&time_buffer);
         strncpy(buffer, ctime(&time_buffer), BSIZE);
         if (sendto(sock, buffer, sizeof(buffer), 0, (struct sockaddr*) &remote_address, remote_len) == -1) {
-          throw std::runtime_error("sendto");
+          throw std::runtime_error(std::string("sendto") + " " + std::strerror(errno));
         } else {
           std::cout << "Sent time: " << buffer << std::endl;
         }

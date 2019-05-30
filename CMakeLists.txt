@@ -15,11 +15,12 @@ macro (add_executable _name)
     # invoke built-in add_executable
     _add_executable(${ARGV})
     if (TARGET ${_name})
-        target_link_libraries(${_name} ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES} stdc++fs)
+        target_link_libraries(${_name} ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES} stdc++fs proto ${PROTOBUF_LIBRARY})
     endif()
 endmacro()
 
 add_executable(netstore-server src/netstore-server.cc)
 add_executable(netstore-client src/netstore-client.cc)
+
 
 install(TARGETS DESTINATION .)
