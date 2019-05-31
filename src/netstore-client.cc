@@ -168,7 +168,7 @@ class client {
   void fetch(const std::string& param) {
     if (files.find(param) != files.end()) {
       auto server_address = remote_address;
-      if (inet_aton(param.c_str(), &server_address.sin_addr) == 0)
+      if (inet_aton(files[param].c_str(), &server_address.sin_addr) == 0)
         throw std::runtime_error("inet_aton");
 
       printf("Sending request...\n");
@@ -181,11 +181,11 @@ class client {
       printf("Waiting for response...\n");
       cmd::complex complex;
       rcv_len = recvfrom(sock, &complex, sizeof(complex), 0, (struct sockaddr*) &server_address, &remote_len);
-      if (rcv_len >= 0 && cmd::eq(complex.cmd, cmd::good_day) && complex.cmd_seq() == simple.cmd_seq()) {
-        std::cout << "Found " << inet_ntoa(remote_address.sin_addr) << " (" << complex.data << ") with free space " << complex.param() << std::endl;
-        //std::cout << complex.to_string() << std::endl;
+      if (rcv_len >= 0 && cmd::eq(complex.cmd, cmd::connect_me) && complex.cmd_seq() == simple.cmd_seq()) {
+        std::cout << "Connect_me " << inet_ntoa(server_address.sin_addr) << ":" << complex.param() << " (" << complex.data << ")" << std::endl;
+      } else {
+        std::cout << "blad" << std::endl;
       }
-
     } else {
       std::cout << "nie ma pliku" << std::endl;
     }

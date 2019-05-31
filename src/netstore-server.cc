@@ -56,7 +56,7 @@ class server {
 
   void hello(struct sockaddr_in& ra, uint64_t cmd_seq);
   void list(struct sockaddr_in& ra, uint64_t cmd_seq, const std::string& s);
-  void get();
+  void get(struct sockaddr_in& ra, uint64_t cmd_seq, const std::string& s);
   void del();
   void add();
 
@@ -170,6 +170,14 @@ void server::list(struct sockaddr_in& ra, uint64_t cmd_seq, const std::string& s
   }
 }
 
+void server::get(struct sockaddr_in& ra, uint64_t cmd_seq, const std::string& s) {
+  cmd::complex complex(cmd::connect_me, cmd_seq, 11111, s.data());
+  if (sendto(sock, (char *) &complex, complex.size(), 0,
+             (struct sockaddr *) &ra, sizeof(ra)) == -1) {
+    throw exception("sendto");
+  }
+}
+
 void server::run() {
   for (auto i = 0; i < REPEAT_COUNT; ++i) {
     cmd::simple simple;
@@ -188,7 +196,7 @@ void server::run() {
     } else if (cmd::eq(simple.cmd, cmd::list)) {
       list(remote_address, simple.cmd_seq(), std::string(simple.data));
     } else if (cmd::eq(simple.cmd, cmd::get)) {
-
+      get(remote_address, simple.cmd_seq(), std::string(simple.data));
     } else if (cmd::eq(simple.cmd, cmd::del)) {
 
     } else if (cmd::eq(simple.cmd, cmd::add)) {
