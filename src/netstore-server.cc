@@ -159,7 +159,7 @@ void server::list(struct sockaddr_in& ra, uint64_t cmd_seq) {
     size_t start = offset;
     offset = list.rfind('\n', offset + cmd::max_simpl_data) + 1;
 
-    cmd::simple simple(cmd::my_list, cmd_seq, list.c_str() + start, offset - start);
+    cmd::simple simple(cmd::my_list, cmd_seq, list.c_str() + start, offset - start - 1);
     if (sendto(sock, (char *) &simple, simple.size(), 0,
                (struct sockaddr *) &ra, sizeof(ra)) == -1) {
       throw exception("sendto");

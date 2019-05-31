@@ -72,10 +72,7 @@ class client {
   }
 
   void search(const std::string& pattern) {
-
     printf("Sending request...\n");
-/*    char buffer[BSIZE];
-    bzero(buffer, BSIZE);*/
     cmd::simple simple { cmd::list, 10, pattern.data() };
     if (sendto(sock, &simple, simple.size(), 0, (struct sockaddr*) &remote_address, sizeof(remote_address)) != simple.size())
       throw std::runtime_error("write");
@@ -88,11 +85,19 @@ class client {
       rcv_len = recvfrom(sock, &simple, sizeof(simple), 0, (struct sockaddr*) &remote_address, &remote_len);
       if (rcv_len >= 0) {
         if (cmd::eq(simple.cmd, cmd::my_list) && simple.cmd_seq() == simple.cmd_seq()) {
-/*          std::cout << "Found " << inet_ntoa(remote_address.sin_addr) << " ("
-                    << complex.data << ") with free space " << complex.param()
-                    << std::endl;*/
-          //std::cout << complex.to_string() << std::endl;
-          std::cout << simple.data;
+          std::string list(simple.data);
+          size_t offset = 0;
+          size_t N = list.length();
+          while (offset < N) {
+            size_t start = offset;
+            offset = list.find('\n', start) + 1;
+            size_t end = offset - 1;
+            if (offset - 1 == std::string::npos) {
+              end = offset = N;
+            }
+            std::string filename(simple.data + start, simple.data + end - 3);
+            std::cout << filename << " (" << inet_ntoa(remote_address.sin_addr) << ")" << std::endl;
+          }
         }
       }
     }
