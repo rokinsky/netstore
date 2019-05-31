@@ -47,27 +47,56 @@ class client {
   void set_timeout();
   void close();
 
-  void hello() {
-    unsigned int remote_len;
-    ssize_t rcv_len;
+  void discover() {
+
     printf("Sending request...\n");
-    char buffer[BSIZE];
-    bzero(buffer, BSIZE);
-    cmd::simple simple { cmd::hello, htobe64(10) };
+/*    char buffer[BSIZE];
+    bzero(buffer, BSIZE);*/
+    cmd::simple simple { cmd::hello, 10 };
 
     if (sendto(sock, &simple, simple.size(), 0, (struct sockaddr*) &remote_address, sizeof(remote_address)) != simple.size())
       throw std::runtime_error("write");
 
-    printf("Waiting for response...\n");
-
-    cmd::complex complex;
-    rcv_len = recvfrom(sock, &complex, sizeof(complex), 0, (struct sockaddr*) &remote_address, &remote_len);
-    if (rcv_len < 0) {
-      printf("Didn't get any response. Repeating request.\n");
-    } else {
-      //printf("Time: %.*s\n", (int)rcv_len, buffer);
-      std::cout << complex.to_string() << std::endl;
+    socklen_t remote_len;
+    ssize_t rcv_len = 0;
+    while (rcv_len >= 0) {
+      printf("Waiting for response...\n");
+      cmd::complex complex;
+      rcv_len = recvfrom(sock, &complex, sizeof(complex), 0, (struct sockaddr*) &remote_address, &remote_len);
+      if (rcv_len >= 0 && cmd::eq(complex.cmd, cmd::good_day) && complex.cmd_seq() == simple.cmd_seq()) {
+        std::cout << "Found " << inet_ntoa(remote_address.sin_addr) << " (" << complex.data << ") with free space " << complex.param() << std::endl;
+        //std::cout << complex.to_string() << std::endl;
+      }
     }
+    printf("Didn't get any response. Break request.\n");
+  }
+
+  void search(const std::string& pattern) {
+
+    printf("Sending request...\n");
+/*    char buffer[BSIZE];
+    bzero(buffer, BSIZE);*/
+    cmd::simple simple { cmd::list, 10, pattern.data() };
+    if (sendto(sock, &simple, simple.size(), 0, (struct sockaddr*) &remote_address, sizeof(remote_address)) != simple.size())
+      throw std::runtime_error("write");
+
+    socklen_t remote_len;
+    ssize_t rcv_len = 0;
+    while (rcv_len >= 0) {
+      printf("Waiting for response...\n");
+      memset(&simple, 0, sizeof(simple));
+      rcv_len = recvfrom(sock, &simple, sizeof(simple), 0, (struct sockaddr*) &remote_address, &remote_len);
+      if (rcv_len >= 0) {
+        if (cmd::eq(simple.cmd, cmd::my_list) && simple.cmd_seq() == simple.cmd_seq()) {
+/*          std::cout << "Found " << inet_ntoa(remote_address.sin_addr) << " ("
+                    << complex.data << ") with free space " << complex.param()
+                    << std::endl;*/
+          //std::cout << complex.to_string() << std::endl;
+          std::cout << simple.data;
+        }
+      }
+    }
+    printf("Didn't get any response. Break request.\n");
   }
 
   std::string remote_dotted_address;
@@ -79,8 +108,23 @@ class client {
     return s == "discover";
   }
 
-  inline bool is_search(const std::string& s) {
-    return std::regex_match(s, std::regex("^search($| |(\\s\\w+))*"));
+  inline bool is_search(const std::string& s, std::string& result) {
+    std::smatch match;
+    auto is_match = std::regex_match(s, std::regex("^search( |(\\s\\w+)*)"));
+
+    if (is_match)
+      result = s.substr(std::min<size_t>(strlen("search "), s.length()));
+
+/*    std::regex pattern(R"(^search(\s\w+)*)");
+    for (auto i = std::sregex_iterator(s.begin(), s.end(), pattern); i != std::sregex_iterator(); ++i) {
+      std::cout << "match: " << i->str() << '\n';
+    }*/
+    std::cout << "match: " << result << std::endl;
+
+    //if (std::regex_search(s, match, std::regex("^search(\\s\\w+)*")))
+    //  std::cout << "match: " << match[1] << '\n';
+
+    return is_match;
   }
 
   inline bool is_fetch(const std::string& s) {
@@ -115,10 +159,13 @@ void client::run() {
   std::getline(std::cin, line);
 
   while(!is_exit(line)) {
+    std::string param;
     if (is_discover(line)) {
       std::cout << "!!discover" << std::endl;
-    } else if (is_search(line)) {
-      std::cout << "!!search" << std::endl;
+      discover();
+    } else if (is_search(line, param)) {
+      std::cout << "!!searched word: " << param << std::endl;
+      search(param);
     } else if (is_fetch(line)) {
       std::cout << "!!fetch" << std::endl;
     } else if (is_upload(line)) {
@@ -128,9 +175,6 @@ void client::run() {
     }
     std::cout << line << std::endl;
     std::getline(std::cin, line);
-  }
-  for (auto i = 0; i < REPEAT_COUNT; ++i) {
-    hello();
   }
   printf("Closing.\n");
   close();
@@ -174,7 +218,7 @@ void client::set_timeout() {
   struct timeval tv({});
   tv.tv_sec = 5;
   tv.tv_usec = 0;
-  setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO,(struct timeval *)&tv,sizeof(struct timeval));
+  setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO,(struct timeval *)&tv, sizeof(struct timeval));
 }
 
 void client::close() {

@@ -54,8 +54,8 @@ class server {
 
   std::unordered_map<std::string, uint64_t> files;
 
-  void hello(struct sockaddr_in& target, uint64_t cmd_seq);
-  void list();
+  void hello(struct sockaddr_in& ra, uint64_t cmd_seq);
+  void list(struct sockaddr_in& ra, uint64_t cmd_seq);
   void get();
   void del();
   void add();
@@ -143,8 +143,27 @@ void server::hello(struct sockaddr_in& ra, uint64_t cmd_seq) {
 
   cmd::complex complex(cmd::good_day, cmd_seq, available_space, MCAST_ADDR.c_str());
   if (sendto(sock, (char *) &complex, complex.size(), 0,
-             (struct sockaddr *) &ra, sizeof(ra)) != -1) {
+             (struct sockaddr *) &ra, sizeof(ra)) == -1) {
     throw exception("sendto");
+  }
+}
+
+void server::list(struct sockaddr_in& ra, uint64_t cmd_seq) {
+  std::string list;
+  for (const auto &[v, k]: files) {
+    list += v + "\n";
+  }
+
+  size_t offset = 0;
+  while (offset < list.length()) {
+    size_t start = offset;
+    offset = list.rfind('\n', offset + cmd::max_simpl_data) + 1;
+
+    cmd::simple simple(cmd::my_list, cmd_seq, list.c_str() + start, offset - start);
+    if (sendto(sock, (char *) &simple, simple.size(), 0,
+               (struct sockaddr *) &ra, sizeof(ra)) == -1) {
+      throw exception("sendto");
+    }
   }
 }
 
@@ -158,13 +177,13 @@ void server::run() {
     printf("address: %s %d\n", inet_ntoa(remote_address.sin_addr),
            ntohs(remote_address.sin_port));
     printf("read %zd bytes: %s, seq: %lu\n", rcv_len, simple.cmd,
-           be64toh(simple.cmd_seq));
+           simple.cmd_seq());
     printf("read data %s\n", simple.data);
 
     if (cmd::eq(simple.cmd, cmd::hello) && simple.is_empty_data()) {
-      hello(remote_address, be64toh(simple.cmd_seq));
+      hello(remote_address, simple.cmd_seq());
     } else if (cmd::eq(simple.cmd, cmd::list)) {
-
+      list(remote_address, simple.cmd_seq());
     } else if (cmd::eq(simple.cmd, cmd::get)) {
 
     } else if (cmd::eq(simple.cmd, cmd::del)) {
@@ -172,7 +191,9 @@ void server::run() {
     } else if (cmd::eq(simple.cmd, cmd::add)) {
       cmd::complex complex(&simple);
     } else {
-      std::cout << "Received unexpected bytes." << std::endl;
+      std::cerr << "[PCKG ERROR] Skipping invalid package from "
+      << inet_ntoa(remote_address.sin_addr) << ":"
+      << ntohs(remote_address.sin_port) << "." << std::endl;
     }
   }
 }

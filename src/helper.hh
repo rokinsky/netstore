@@ -79,13 +79,13 @@ struct simple;
 
 struct __attribute__ ((packed)) simple {
   char cmd[max_cmd] = {0};
-  uint64_t cmd_seq = 0;
+  uint64_t _cmd_seq = 0;
   char data[max_simpl_data] = {0};
 
-  simple(const char *cmd_, uint64_t cmd_seq_, const char *data_ = "") {
+  simple(const char *cmd_, uint64_t cmd_seq_, const char *data_ = "", size_t data_size = max_simpl_data) {
     strncpy(cmd, cmd_, max_cmd);
-    cmd_seq = cmd_seq_;
-    strncpy(data, data_, max_simpl_data);
+    _cmd_seq = htobe64(cmd_seq_);
+    strncpy(data, data_, data_size);
   }
 
   explicit simple(complex* complex) {
@@ -93,6 +93,10 @@ struct __attribute__ ((packed)) simple {
   }
 
   simple() = default;
+
+  uint64_t cmd_seq() {
+    return be64toh(_cmd_seq);
+  }
 
   size_t set_data(const char *d) {
     strncpy(data, d, max_simpl_data);
@@ -104,7 +108,7 @@ struct __attribute__ ((packed)) simple {
   }
 
   size_t size() {
-    return sizeof(cmd) + sizeof(cmd_seq) + strlen(data);
+    return sizeof(cmd) + sizeof(_cmd_seq) + strlen(data);
   }
 
   inline bool is_empty_data() {
@@ -114,16 +118,16 @@ struct __attribute__ ((packed)) simple {
 
 struct __attribute__ ((packed)) complex {
   char cmd[max_cmd] = {0};
-  uint64_t cmd_seq = 0;
-  uint64_t param = 0;
+  uint64_t _cmd_seq = 0;
+  uint64_t _param = 0;
   char data[max_cmlpx_data] = {0};
 
   complex() = default;
 
   complex(const char* cmd_, uint64_t cmd_seq_, uint64_t param_, const char* data_ = "") {
     strncpy(cmd, cmd_, max_cmd);
-    cmd_seq = htobe64(cmd_seq_);
-    param = htobe64(param_);
+    _cmd_seq = htobe64(cmd_seq_);
+    _param = htobe64(param_);
     strncpy(data, data_, max_simpl_data);
   }
 
@@ -133,13 +137,21 @@ struct __attribute__ ((packed)) complex {
 
   std::string to_string() {
     return std::string(std::string(cmd) + " "
-    + std::to_string(be64toh(cmd_seq)) + " "
-    + std::to_string(be64toh(param)) + " "
+    + std::to_string(be64toh(_cmd_seq)) + " "
+    + std::to_string(be64toh(_param)) + " "
     + std::string(data));
   }
 
+  uint64_t cmd_seq() {
+    return be64toh(_cmd_seq);
+  }
+
+  uint64_t param() {
+    return be64toh(_param);
+  }
+
   size_t size() {
-    return sizeof(cmd) + sizeof(cmd_seq) + sizeof(param) + strlen(data);
+    return sizeof(cmd) + sizeof(_cmd_seq) + sizeof(_param) + strlen(data);
   }
 };
 
