@@ -108,14 +108,16 @@ class client {
     if (sendto(sock, &simple, simple.size(), 0, (struct sockaddr*) &remote_address, sizeof(remote_address)) != simple.size())
       throw std::runtime_error("write");
 
-    socklen_t remote_len;
+    socklen_t remote_len = sizeof(struct sockaddr_in);
     ssize_t rcv_len = 0;
+    struct sockaddr_in ra{};
+
     while (rcv_len >= 0) {
       printf("Waiting for response...\n");
       cmd::complex complex;
-      rcv_len = recvfrom(sock, &complex, sizeof(complex), 0, (struct sockaddr*) &remote_address, &remote_len);
+      rcv_len = recvfrom(sock, &complex, sizeof(complex), 0, (struct sockaddr*) &ra, &remote_len);
       if (rcv_len >= 0 && cmd::eq(complex.cmd, cmd::good_day) && complex.cmd_seq() == simple.cmd_seq()) {
-        std::cout << "Found " << inet_ntoa(remote_address.sin_addr) << " (" << complex.data << ") with free space " << complex.param() << std::endl;
+        std::cout << "Found " << inet_ntoa(ra.sin_addr) << " (" << complex.data << ") with free space " << complex.param() << std::endl;
         //std::cout << complex.to_string() << std::endl;
       }
     }
@@ -129,13 +131,17 @@ class client {
     if (sendto(sock, &simple, simple.size(), 0, (struct sockaddr*) &remote_address, sizeof(remote_address)) != simple.size())
       throw std::runtime_error("write");
 
-    socklen_t remote_len;
+    socklen_t remote_len = sizeof(struct sockaddr_in);
     ssize_t rcv_len = 0;
+    struct sockaddr_in ra{};
+
     while (rcv_len >= 0) {
       printf("Waiting for response...\n");
       memset(&simple, 0, sizeof(simple));
-      rcv_len = recvfrom(sock, &simple, sizeof(simple), 0, (struct sockaddr*) &remote_address, &remote_len);
+      rcv_len = recvfrom(sock, &simple, sizeof(simple), 0, (struct sockaddr *) &ra, &remote_len);
       if (rcv_len >= 0) {
+        printf("address: %s:%d\n", inet_ntoa(ra.sin_addr),
+               ntohs(ra.sin_port));
         if (cmd::eq(simple.cmd, cmd::my_list) && simple.cmd_seq() == simple.cmd_seq()) {
           std::string list(simple.data);
           size_t offset = 0;
@@ -148,13 +154,41 @@ class client {
               end = offset = N;
             }
             std::string filename(simple.data + start, simple.data + end);
-            files[filename] = std::string(inet_ntoa(remote_address.sin_addr));
-            std::cout << filename << " (" << inet_ntoa(remote_address.sin_addr) << ")" << std::endl;
+            files[filename] = std::string(inet_ntoa(ra.sin_addr));
+            std::cout << filename << " (" << inet_ntoa(ra.sin_addr) << ")" << std::endl;
           }
+        } else {
+          // TODO error
         }
       }
     }
     printf("Didn't get any response. Break request.\n");
+  }
+
+  void fetch(const std::string& param) {
+    if (files.find(param) != files.end()) {
+      auto server_address = remote_address;
+      if (inet_aton(param.c_str(), &server_address.sin_addr) == 0)
+        throw std::runtime_error("inet_aton");
+
+      printf("Sending request...\n");
+      cmd::simple simple { cmd::get, 10, param.data() };
+      if (sendto(sock, &simple, simple.size(), 0, (struct sockaddr*) &server_address, sizeof(server_address)) != simple.size())
+        throw std::runtime_error("write");
+
+      socklen_t remote_len;
+      ssize_t rcv_len = 0;
+      printf("Waiting for response...\n");
+      cmd::complex complex;
+      rcv_len = recvfrom(sock, &complex, sizeof(complex), 0, (struct sockaddr*) &server_address, &remote_len);
+      if (rcv_len >= 0 && cmd::eq(complex.cmd, cmd::good_day) && complex.cmd_seq() == simple.cmd_seq()) {
+        std::cout << "Found " << inet_ntoa(remote_address.sin_addr) << " (" << complex.data << ") with free space " << complex.param() << std::endl;
+        //std::cout << complex.to_string() << std::endl;
+      }
+
+    } else {
+      std::cout << "nie ma pliku" << std::endl;
+    }
   }
 
   std::string remote_dotted_address;
@@ -225,6 +259,7 @@ void client::run() {
       search(param);
     } else if (is_fetch(line, param)) {
       std::cout << "!!fetch" << std::endl;
+      fetch(param);
     } else if (is_upload(line)) {
       std::cout << "!!upload" << std::endl;
     } else if (is_remove(line)) {
@@ -256,7 +291,7 @@ void client::set_ttl() {
 }
 
 void client::bind_local() {
-  struct sockaddr_in local_address({});
+  struct sockaddr_in local_address{};
   local_address.sin_family = AF_INET;
   local_address.sin_addr.s_addr = htonl(INADDR_ANY);
   local_address.sin_port = htons(0);
