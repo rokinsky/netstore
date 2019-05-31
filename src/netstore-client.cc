@@ -95,7 +95,7 @@ class client {
             if (offset - 1 == std::string::npos) {
               end = offset = N;
             }
-            std::string filename(simple.data + start, simple.data + end - 3);
+            std::string filename(simple.data + start, simple.data + end);
             std::cout << filename << " (" << inet_ntoa(remote_address.sin_addr) << ")" << std::endl;
           }
         }
@@ -114,6 +114,7 @@ class client {
   }
 
   inline bool is_search(const std::string& s, std::string& result) {
+    /* TODO fix .jpg */
     std::smatch match;
     auto is_match = std::regex_match(s, std::regex("^search( |(\\s\\w+)*)"));
 

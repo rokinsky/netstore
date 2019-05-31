@@ -55,7 +55,7 @@ class server {
   std::unordered_map<std::string, uint64_t> files;
 
   void hello(struct sockaddr_in& ra, uint64_t cmd_seq);
-  void list(struct sockaddr_in& ra, uint64_t cmd_seq);
+  void list(struct sockaddr_in& ra, uint64_t cmd_seq, const std::string& s);
   void get();
   void del();
   void add();
@@ -148,10 +148,13 @@ void server::hello(struct sockaddr_in& ra, uint64_t cmd_seq) {
   }
 }
 
-void server::list(struct sockaddr_in& ra, uint64_t cmd_seq) {
+void server::list(struct sockaddr_in& ra, uint64_t cmd_seq, const std::string& s) {
   std::string list;
-  for (const auto &[v, k]: files) {
-    list += v + "\n";
+  std::cout << "searching for " << s << std::endl;
+  for (const auto &[k, v]: files) {
+    if (s.empty() || k.find(s) != std::string::npos) {
+      list += k + '\n';
+    }
   }
 
   size_t offset = 0;
@@ -183,7 +186,7 @@ void server::run() {
     if (cmd::eq(simple.cmd, cmd::hello) && simple.is_empty_data()) {
       hello(remote_address, simple.cmd_seq());
     } else if (cmd::eq(simple.cmd, cmd::list)) {
-      list(remote_address, simple.cmd_seq());
+      list(remote_address, simple.cmd_seq(), std::string(simple.data));
     } else if (cmd::eq(simple.cmd, cmd::get)) {
 
     } else if (cmd::eq(simple.cmd, cmd::del)) {
