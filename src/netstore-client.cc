@@ -11,6 +11,8 @@
 #include <boost/serialization/access.hpp>
 #include <fstream>
 #include <iostream>
+#include <string>
+#include <regex>
 
 #include "helper.hh"
 
@@ -72,6 +74,30 @@ class client {
   in_port_t remote_port;
   int sock;
   struct sockaddr_in remote_address;
+
+  inline bool is_discover(const std::string& s) {
+    return s == "discover";
+  }
+
+  inline bool is_search(const std::string& s) {
+    return std::regex_match(s, std::regex("^search($| |(\\s\\w+))*"));
+  }
+
+  inline bool is_fetch(const std::string& s) {
+    return std::regex_match(s, std::regex("^fetch(\\s\\w+)+"));
+  }
+
+  inline bool is_upload(const std::string& s) {
+    return std::regex_match(s, std::regex("^upload(\\s\\w+)+"));
+  }
+
+  inline bool is_remove(const std::string& s) {
+    return std::regex_match(s, std::regex("^remove(\\s\\w+)+"));
+  }
+
+  inline bool is_exit(const std::string& s) {
+    return s == "exit";
+  }
 };
 
 void client::connect() {
@@ -85,7 +111,24 @@ void client::connect() {
 
 void client::run() {
 
+  std::string line;
+  std::getline(std::cin, line);
 
+  while(!is_exit(line)) {
+    if (is_discover(line)) {
+      std::cout << "!!discover" << std::endl;
+    } else if (is_search(line)) {
+      std::cout << "!!search" << std::endl;
+    } else if (is_fetch(line)) {
+      std::cout << "!!fetch" << std::endl;
+    } else if (is_upload(line)) {
+      std::cout << "!!upload" << std::endl;
+    } else if (is_remove(line)) {
+      std::cout << "!!remove" << std::endl;
+    }
+    std::cout << line << std::endl;
+    std::getline(std::cin, line);
+  }
   for (auto i = 0; i < REPEAT_COUNT; ++i) {
     hello();
   }
