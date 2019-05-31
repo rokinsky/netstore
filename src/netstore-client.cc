@@ -1,3 +1,53 @@
+/* TODO timeout
+ * Maciej Bala Jak mamy watek o sieciach, to ja mam pytanie. Jak wykonujecie czekanie TIMEOUT sekund w poleceniu discover? Select albo poll maja opcje timeoutu, ale blokuja tylko do przyjscia pierwszego pakietu, ktory rownie dobrze moze przyjsc prawie od razu. Ja poki co uzywam do tego sleepa po prostu, ale nie wiem czy o to chodzi. Ta sama kwestia pojawia sie w sumie w poleceniu search
+Ukryj lub zgłoś
+Lubię to!
+ · Odpowiedz · 2 d · Edytowano
+Kuba Martin
+Kuba Martin timerfd_create
+Ukryj lub zgłoś
+Lubię to!
+ · Odpowiedz · 2 d
+Kuba Martin
+Kuba Martin Daje Ci fd na którym możesz pollować
+Ukryj lub zgłoś
+Lubię to!
+ · Odpowiedz · 2 d
+Maciej Bala
+Maciej Bala Czyli jak dobrze rozumiem, to wywolanie polla na tym fd tak samo zablokuje proces jak sleep? Czy da sie jakos wykryc i przerobic wczesniejsze komunikaty, jeszcze przed uplywem TIMEOUT sekund?
+Ukryj lub zgłoś
+Lubię to!
+ · Odpowiedz · 2 d
+Kuba Martin
+Kuba Martin Poll przyjmuje tablicę pollfd, więc jak mu dasz pollfd timerów i socketów to zwróci Ci pierwszy z którym będzie coś do zrobienia.
+Ukryj lub zgłoś
+Lubię to!
+ · Odpowiedz · 2 d
+Filip Mikina
+Filip Mikina Maciej Bala
+Ukryj lub zgłoś
+Brak dostępnego opisu zdjęcia.
+1
+Lubię to!
+ · Odpowiedz · 2 d
+Filip Mikina
+Filip Mikina mam nadzieje ze sie kod sam dokumentuje
+Ukryj lub zgłoś
+Lubię to!
+ · Odpowiedz · 2 d
+Maciej Bala
+Maciej Bala Filip Mikina A co robi fill_timeout i set_read_timeout?
+Ukryj lub zgłoś
+Lubię to!
+ · Odpowiedz · 2 d
+Filip Mikina
+Filip Mikina Maciej Bala fill_timeout ustawia read_timeout na timeout - tyle_ile_czasu_uplynelo, set_read_timeout ustawia read timeout socketu na read_timeout
+Ukryj lub zgłoś
+Lubię to!
+ · Odpowiedz · 2 d
+*/
+
+
 #include <boost/program_options/option.hpp>
 #include <boost/program_options/options_description.hpp>
 #include <arpa/inet.h>
@@ -13,6 +63,7 @@
 #include <iostream>
 #include <string>
 #include <regex>
+#include <unordered_map>
 
 #include "helper.hh"
 
@@ -73,6 +124,7 @@ class client {
 
   void search(const std::string& pattern) {
     printf("Sending request...\n");
+    files.clear();
     cmd::simple simple { cmd::list, 10, pattern.data() };
     if (sendto(sock, &simple, simple.size(), 0, (struct sockaddr*) &remote_address, sizeof(remote_address)) != simple.size())
       throw std::runtime_error("write");
@@ -96,6 +148,7 @@ class client {
               end = offset = N;
             }
             std::string filename(simple.data + start, simple.data + end);
+            files[filename] = std::string(inet_ntoa(remote_address.sin_addr));
             std::cout << filename << " (" << inet_ntoa(remote_address.sin_addr) << ")" << std::endl;
           }
         }
@@ -108,33 +161,31 @@ class client {
   in_port_t remote_port;
   int sock;
   struct sockaddr_in remote_address;
+  std::unordered_map<std::string, std::string> files;
+
 
   inline bool is_discover(const std::string& s) {
     return s == "discover";
   }
 
-  inline bool is_search(const std::string& s, std::string& result) {
-    /* TODO fix .jpg */
+  inline bool is_search(const std::string& s, std::string& param) {
     std::smatch match;
-    auto is_match = std::regex_match(s, std::regex("^search( |(\\s\\w+)*)"));
+    auto is_match = std::regex_match(s, std::regex("^search( |( (.*))?)"));
 
     if (is_match)
-      result = s.substr(std::min<size_t>(strlen("search "), s.length()));
-
-/*    std::regex pattern(R"(^search(\s\w+)*)");
-    for (auto i = std::sregex_iterator(s.begin(), s.end(), pattern); i != std::sregex_iterator(); ++i) {
-      std::cout << "match: " << i->str() << '\n';
-    }*/
-    std::cout << "match: " << result << std::endl;
-
-    //if (std::regex_search(s, match, std::regex("^search(\\s\\w+)*")))
-    //  std::cout << "match: " << match[1] << '\n';
+      param = s.substr(std::min<size_t>(strlen("search "), s.length()));
 
     return is_match;
   }
 
-  inline bool is_fetch(const std::string& s) {
-    return std::regex_match(s, std::regex("^fetch(\\s\\w+)+"));
+  inline bool is_fetch(const std::string& s, std::string& param) {
+    std::smatch match;
+    auto is_match = std::regex_match(s, std::regex("^fetch( (.+)){1}"));
+
+    if (is_match)
+      param = s.substr(std::min<size_t>(strlen("fetch "), s.length()));
+
+    return is_match;
   }
 
   inline bool is_upload(const std::string& s) {
@@ -172,7 +223,7 @@ void client::run() {
     } else if (is_search(line, param)) {
       std::cout << "!!searched word: " << param << std::endl;
       search(param);
-    } else if (is_fetch(line)) {
+    } else if (is_fetch(line, param)) {
       std::cout << "!!fetch" << std::endl;
     } else if (is_upload(line)) {
       std::cout << "!!upload" << std::endl;
@@ -221,10 +272,8 @@ void client::set_target() {
 }
 
 void client::set_timeout() {
-  struct timeval tv({});
-  tv.tv_sec = 5;
-  tv.tv_usec = 0;
-  setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO,(struct timeval *)&tv, sizeof(struct timeval));
+  struct timeval tv {5, 0};
+  setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(struct timeval));
 }
 
 void client::close() {

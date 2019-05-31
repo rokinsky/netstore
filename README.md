@@ -378,3 +378,12 @@ Rozwiązanie dostarczone w `I` terminie można poprawić jednokrotnie w `II` ter
 W `II` terminie nie odejmuje się punktów za spóźnienia. Rozwiązania z datą późniejszą niż `7` dni przed egzaminem poprawkowym nie podlegają ocenie.
 
 ## Q&A
+
+* Czy dopuszczamy działanie kilku serwerów na jednej maszynie i jeśli tak, to czy można ustawić setsockopt na SO_REUSEADDR?
+> Tak, dopuszczamy.
+Może Pan ustawić flagę gniazda zgodnie z własną decyzją podjętą co do realizacji implementacji. 
+
+* Skoro serwer indeksuje na początku działania pliki, to czy przy każdej prośbie o listę plików od klienta powinien odsyłać (potencjalnie zmodyfikowaną) listę zaindeksowanych plików, czy powinien za każdym razem iterować się po swoim folderze w celu stworzenia listy?
+> Serwer na początku swojego działania indeksuje pliki zawarte we wskazanym folderze. Proszę jednak nie zapominać aby serwer w trakcie swojego działania aktualizował listę przechowywanych przez siebie plików o pliki dodane i/lub skasowane. 
+
+*
