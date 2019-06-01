@@ -12,10 +12,15 @@
 #include "helper.hh"
 #include <unistd.h>
 
-
 #define MAX_UDP 65507
 #define BSIZE         1024
 #define REPEAT_COUNT  30
+
+namespace netstore::sockets {
+  class udp {
+
+  };
+}
 
 namespace netstore {
 
@@ -125,22 +130,6 @@ void server::connect() {
 }
 
 void server::hello(struct sockaddr_in& ra, uint64_t cmd_seq) {
-/*  cmd::complex complex(cmd::good_day, cmd_seq, available_space, MCAST_ADDR.c_str());
-
-  time_t time_buffer;
-  char buffer[BSIZE];
-  bzero(buffer, BSIZE);
-  time(&time_buffer);
-  strncpy(buffer, ctime(&time_buffer), BSIZE);
-  printf("address: %s %d\n", inet_ntoa(target->sin_addr),
-         ntohs(target->sin_port));
-  std::cout << "hello send: " << complex.to_string() << std::endl;
-
-  if (sendto(sock, buffer, sizeof(buffer), 0,
-             (struct sockaddr *) &target, sizeof(*target)) != complex.size()) {
-    throw exception("sendto");
-  }*/
-
   cmd::complex complex(cmd::good_day, cmd_seq, available_space, MCAST_ADDR.c_str());
   if (sendto(sock, (char *) &complex, complex.size(), 0,
              (struct sockaddr *) &ra, sizeof(ra)) == -1) {
@@ -171,11 +160,20 @@ void server::list(struct sockaddr_in& ra, uint64_t cmd_seq, const std::string& s
 }
 
 void server::get(struct sockaddr_in& ra, uint64_t cmd_seq, const std::string& s) {
+  // open socket
+  int sock_tcp = socket(PF_INET, SOCK_STREAM, 0); // creating IPv4 TCP socket
+  if (sock_tcp < 0)
+    throw exception("socket");
+
+
+
   cmd::complex complex(cmd::connect_me, cmd_seq, 11111, s.data());
   if (sendto(sock, (char *) &complex, complex.size(), 0,
              (struct sockaddr *) &ra, sizeof(ra)) == -1) {
     throw exception("sendto");
   }
+
+  // listen on socket
 }
 
 void server::run() {
