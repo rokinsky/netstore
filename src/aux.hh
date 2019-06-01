@@ -27,6 +27,14 @@ namespace netstore::aux {
       );
     }
   }
+
+  inline std::string path(const std::string& dir, const std::string& filename) {
+    return dir + '/' + filename;
+  }
+
+  inline bool validate(const std::string& filename) {
+    return !(filename.empty() || filename.find('/', 0) != std::string::npos);
+  }
 }
 
 #endif //NETSTORE_2_AUX_HH

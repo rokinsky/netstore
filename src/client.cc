@@ -193,9 +193,8 @@ void client::fetch(const std::string& param) {
   if (rcv_len >= 0 && cmd::validate(complex, simple, cmd::connect_me)) {
     std::cout << "Connect_me " << inet_ntoa(server_address.sin_addr) << ":" << complex.param() << " (" << complex.data << ")" << std::endl;
 
-    std::ofstream file;
-    file.open(out_fldr + '/' + complex.data, std::ofstream::binary
-      | std::ofstream::out | std::ofstream::trunc);
+    const auto path = aux::path(out_fldr, complex.data);
+    std::ofstream file(path, std::ofstream::binary | std::ofstream::out | std::ofstream::trunc);
 
     if (file.is_open()) {
       sockets::tcp tcp;

@@ -83,7 +83,7 @@ class tcp {
 
   in_port_t port();
 
-  void write(size_t n = buffer_size);
+  void write(ssize_t n = buffer_size);
   ssize_t read();
 
   char* buffer();

@@ -19,8 +19,6 @@
 #include "aux.hh"
 #include "cmd.hh"
 
-#define MAX_UDP 65507
-#define BSIZE         1024
 #define REPEAT_COUNT  30
 
 namespace netstore {
@@ -113,7 +111,7 @@ void server::list(sockaddr_in& ra, uint64_t cmd_seq, const std::string& s) {
 }
 
 void server::get(sockaddr_in& ra, uint64_t cmd_seq, const std::string& s) {
-  if (s.empty() || s.find('/', 0) != std::string::npos)
+  if (not aux::validate(s))
     return;
 
   sockets::tcp tcp;
@@ -123,9 +121,8 @@ void server::get(sockaddr_in& ra, uint64_t cmd_seq, const std::string& s) {
   udp.send(complex, ra);
 
   auto msg_tcp = tcp.accept();
-  std::ifstream file;
-  const auto path = shrd_fldr + "/" + s;
-  file.open(path, std::ifstream::binary | std::ifstream::in);
+  const auto path = aux::path(shrd_fldr, s);
+  std::ifstream file(path, std::ifstream::binary | std::ifstream::in);
   auto file_size = std::filesystem::file_size(path);
 
   if (file.is_open()) {
@@ -144,6 +141,7 @@ void server::get(sockaddr_in& ra, uint64_t cmd_seq, const std::string& s) {
 }
 
 void server::run() {
+  /* TODO endless loop */
   for (auto i = 0; i < REPEAT_COUNT; ++i) {
     cmd::simple simple;
     sockaddr_in remote_address{};

@@ -42,7 +42,8 @@ namespace netstore::sockets {
   }
 
   void udp::set_ttl(int32_t value) {
-    if (setsockopt(sock, IPPROTO_IP, IP_MULTICAST_TTL, (void*)&value, sizeof value) < 0)
+    if (setsockopt(sock, IPPROTO_IP, IP_MULTICAST_TTL, (void *) &value,
+                   sizeof value) < 0)
       throw exception("udp::setsockopt multicast ttl");
   }
 
@@ -67,7 +68,7 @@ namespace netstore::sockets {
 
   void udp::set_broadcast() {
     int optval = 1;
-    if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, (void*)&optval, sizeof optval) < 0)
+    if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, (void *) &optval, sizeof optval) < 0)
       throw std::runtime_error("udp::setsockopt broadcast");
   }
 
@@ -88,8 +89,7 @@ namespace netstore::sockets {
     sockaddr_in client_address{};
     socklen_t client_address_len = sizeof(client_address);
 
-    int msg_sock =
-        ::accept(sock, (sockaddr*)&client_address, &client_address_len);
+    auto msg_sock = ::accept(sock, (sockaddr*)&client_address, &client_address_len);
     if (msg_sock < 0) {
       throw exception("tcp::accept");
     }
@@ -116,7 +116,7 @@ namespace netstore::sockets {
     sa.sin_port = port;
     sa.sin_family = AF_INET;
     if (inet_aton(addr.c_str(), &sa.sin_addr) == 0)
-      throw exception("udp::inet_aton");
+      throw exception("tcp::inet_aton");
 
     socklen_t addr_len = sizeof(sockaddr_in);
 
@@ -142,15 +142,14 @@ namespace netstore::sockets {
     if (::close(sock) < 0) throw exception("tcp::close");
   }
 
-  void tcp::write(size_t n) {
+  void tcp::write(ssize_t n) {
     if (::write(sock, _buffer, n) != n)
       throw exception("tcp::write");
   }
 
-  /* only sequence read */
   ssize_t tcp::read() {
     bzero(_buffer, buffer_size);
-    ssize_t nread = ::read(sock, &_buffer, buffer_size);
+    ssize_t nread = ::read(sock, _buffer, buffer_size);
     if (nread < 0) throw exception("tcp::read");
     return nread;
   }

@@ -62,7 +62,7 @@ namespace netstore::cmd {
       return strlen(data);
     }
 
-    inline size_t size() {
+    inline ssize_t size() {
       return sizeof(cmd) + sizeof(_cmd_seq) + strlen(data);
     }
 
@@ -93,7 +93,7 @@ namespace netstore::cmd {
       return be64toh(_param);
     }
 
-    inline size_t size() {
+    inline ssize_t size() {
       return sizeof(cmd) + sizeof(_cmd_seq) + sizeof(_param) + strlen(data);
     }
   };
