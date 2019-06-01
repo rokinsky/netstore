@@ -142,8 +142,8 @@ namespace netstore::sockets {
     if (::close(sock) < 0) throw exception("tcp::close");
   }
 
-  void tcp::write(const std::string& msg) {
-    if ((size_t)::write(sock, msg.c_str(), msg.length()) != msg.length())
+  void tcp::write(size_t n) {
+    if (::write(sock, _buffer, n) != n)
       throw exception("tcp::write");
   }
 

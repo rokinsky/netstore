@@ -13,6 +13,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/time.h>
+#include <fstream>
 
 #include "sockets.hh"
 #include "aux.hh"
@@ -112,22 +113,34 @@ void server::list(struct sockaddr_in& ra, uint64_t cmd_seq, const std::string& s
 }
 
 void server::get(struct sockaddr_in& ra, uint64_t cmd_seq, const std::string& s) {
-  // open socket
+  if (s.empty() || s.find('/', 0) != std::string::npos)
+    return;
+
   sockets::tcp tcp;
   tcp.bind();
-  auto port = tcp.port();
   tcp.listen();
-  cmd::complex complex(cmd::connect_me, cmd_seq, port, s.data());
+  cmd::complex complex(cmd::connect_me, cmd_seq, tcp.port(), s.data());
   udp.send(complex, ra);
 
   auto msg_tcp = tcp.accept();
+  std::ifstream file;
+  const auto path = shrd_fldr + "/" + s;
+  file.open(path, std::ifstream::binary | std::ifstream::in);
+  auto file_size = std::filesystem::file_size(path);
 
-  auto nread = msg_tcp.read();
+  if (file.is_open()) {
+    while (file_size > 0) {
+      auto nread = std::min<std::streamsize>(sockets::tcp::buffer_size, file_size);
+      file.read(msg_tcp.buffer(), nread);
+      msg_tcp.write(file.gcount());
+      file_size -= file.gcount();
+    }
 
-  std::cout << "tcp readed: " << msg_tcp.buffer() << "(" << nread << ")"<< std::endl;
-
-  msg_tcp.write("hello from server");
-  // listen on socket
+    file.close();
+    std::cout << "file send" << std::endl;
+  } else {
+    std::cout << "error!!! file send" << std::endl;
+  }
 }
 
 void server::run() {

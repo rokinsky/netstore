@@ -62,6 +62,8 @@ class udp {
 
 class tcp {
  public:
+  static constexpr size_t buffer_size = 1024 * 512;
+
   tcp();
   tcp(uint32_t sock);
 
@@ -81,13 +83,12 @@ class tcp {
 
   in_port_t port();
 
-  void write(const std::string& msg);
+  void write(size_t n = buffer_size);
   ssize_t read();
 
   char* buffer();
  private:
   int sock;
-  static constexpr size_t buffer_size = 1024 * 512;
   char _buffer[buffer_size];
 };
 

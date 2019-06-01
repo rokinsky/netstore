@@ -75,7 +75,6 @@ Lubię to!
 #define BSIZE         256
 #define TTL_VALUE     4
 #define REPEAT_COUNT  3
-#define SLEEP_TIME    5
 
 namespace netstore {
 
@@ -174,47 +173,47 @@ void client::search(const std::string& pattern) {
 }
 
 void client::fetch(const std::string& param) {
-  if (files.find(param) != files.end()) {
-    auto server_address = remote_address;
-    if (inet_aton(files[param].c_str(), &server_address.sin_addr) == 0)
-      throw std::runtime_error("inet_aton");
+  if (files.find(param) == files.end()) {
+    std::cout << "nie ma pliku" << std::endl;
+    return;
+  }
 
-    printf("Sending request...\n");
-    cmd::simple simple { cmd::get, 10, param.data() };
-    udp.send(simple, server_address);
+  auto server_address = remote_address;
+  if (inet_aton(files[param].c_str(), &server_address.sin_addr) == 0)
+    throw std::runtime_error("inet_aton");
 
-    ssize_t rcv_len = 0;
-    printf("Waiting for response...\n");
-    cmd::complex complex;
-    rcv_len = udp.recv(complex, server_address);
+  printf("Sending request...\n");
+  cmd::simple simple { cmd::get, 10, param.data() };
+  udp.send(simple, server_address);
 
-    if (rcv_len >= 0 && cmd::validate(complex, simple, cmd::connect_me)) {
-      std::cout << "Connect_me " << inet_ntoa(server_address.sin_addr) << ":" << complex.param() << " (" << complex.data << ")" << std::endl;
+  ssize_t rcv_len = 0;
+  printf("Waiting for response...\n");
+  cmd::complex complex;
+  rcv_len = udp.recv(complex, server_address);
 
-      std::ofstream file;
-      file.open(out_fldr + '/' + complex.data, std::ios::binary | std::ios::out | std::ios::trunc);
+  if (rcv_len >= 0 && cmd::validate(complex, simple, cmd::connect_me)) {
+    std::cout << "Connect_me " << inet_ntoa(server_address.sin_addr) << ":" << complex.param() << " (" << complex.data << ")" << std::endl;
 
-      if (file.is_open()) {
-        sockets::tcp tcp;
-        tcp.connect(files[param], complex.param());
+    std::ofstream file;
+    file.open(out_fldr + '/' + complex.data, std::ofstream::binary
+      | std::ofstream::out | std::ofstream::trunc);
 
-        tcp.write("hello from client");
+    if (file.is_open()) {
+      sockets::tcp tcp;
+      tcp.connect(files[param], complex.param());
 
-        ssize_t nread;
-        while ((nread = tcp.read()) > 0) {
-          file.write(tcp.buffer(), nread);
-          std::cout << "tcp readed: " << tcp.buffer() << "(" << nread << ")" << std::endl;
-        }
-
-        //auto nread = tcp.read(msg);
-
-        file.close();
+      ssize_t nread;
+      while ((nread = tcp.read()) > 0) {
+        file.write(tcp.buffer(), nread);
       }
+
+      file.close();
+      std::cout << "file received" << std::endl;
     } else {
-      std::cout << "blad" << std::endl;
+      std::cout << "error!!! file received" << std::endl;
     }
   } else {
-    std::cout << "nie ma pliku" << std::endl;
+    std::cout << "blad" << std::endl;
   }
 }
 
@@ -223,7 +222,7 @@ void client::fetch(const std::string& param) {
 void client::connect() {
   udp.set_broadcast();
   udp.set_ttl(TTL_VALUE);
-  udp.set_timeout(SLEEP_TIME, 0);
+  udp.set_timeout(timeout, 0);
 
   set_target();
 }
