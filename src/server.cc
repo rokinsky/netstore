@@ -60,27 +60,31 @@ class server {
   void del();
   void add();
 
-  uint64_t index_files() {
-    namespace fs = std::filesystem;
-    uint64_t total_size = 0;
-    for (auto& p: fs::directory_iterator(SHRD_FLDR)) {
-      if (p.is_regular_file()) {
-        files[p.path().filename().string()] = p.file_size();
-        total_size += p.file_size();
-        std::cout << p.path().filename().string() << "(" << p.file_size() << ")" << '\n';
-      }
-    }
-    std::cout << "total size: " << total_size << std::endl;
-    return total_size;
-  }
+  uint64_t index_files();
 
-  ssize_t read_cmd(cmd::simple& cmd, struct sockaddr_in& remote) {
-    ssize_t rcv_len = udp.recv(cmd, remote);
-    if (rcv_len < 0)
-      throw exception("read");
-    return rcv_len;
-  }
+  ssize_t read_cmd(cmd::simple& cmd, struct sockaddr_in& remote);
 };
+
+uint64_t server::index_files() {
+  namespace fs = std::filesystem;
+  uint64_t total_size = 0;
+  for (auto& p: fs::directory_iterator(SHRD_FLDR)) {
+    if (p.is_regular_file()) {
+      files[p.path().filename().string()] = p.file_size();
+      total_size += p.file_size();
+      std::cout << p.path().filename().string() << "(" << p.file_size() << ")" << '\n';
+    }
+  }
+  std::cout << "total size: " << total_size << std::endl;
+  return total_size;
+}
+
+ssize_t server::read_cmd(cmd::simple& cmd, struct sockaddr_in& remote) {
+  ssize_t rcv_len = udp.recv(cmd, remote);
+  if (rcv_len < 0)
+    throw exception("read");
+  return rcv_len;
+}
 
 void server::hello(struct sockaddr_in& ra, uint64_t cmd_seq) {
   cmd::complex complex(cmd::good_day, cmd_seq, available_space, MCAST_ADDR.c_str());
@@ -147,7 +151,7 @@ void server::run() {
     }
   }
 }
-}
+} // namespace netstore
 
 int main(int ac, char** av) {
   namespace bpo = boost::program_options;

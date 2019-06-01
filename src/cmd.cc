@@ -22,7 +22,6 @@ namespace netstore::cmd {
     return std::min<size_t>(max_simpl_data, std::strlen(d));
   }
 
-
   std::string complex::to_string() {
     return std::string(std::string(cmd) + " "
                        + std::to_string(be64toh(_cmd_seq)) + " "

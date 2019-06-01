@@ -9,31 +9,31 @@ namespace netstore::cmd {
   constexpr size_t max_simpl_data = max_udp - max_cmd - sizeof(uint64_t);
   constexpr size_t max_cmlpx_data = max_udp - max_cmd - 2 * sizeof(uint64_t);
 
-  template <typename C>
-  inline bool validate(C a, C b, const std::string& expected) {
-    return false;
-  }
-
   inline bool eq(const char* a, const char* b) {
     return strncmp(a, b, max_cmd) == 0;
   }
 
-/* Rozpoznawanie listy serwerów w grupie */
+  template <typename A, typename B>
+  inline bool validate(A& rcv, B& snd, const std::string& expected) {
+    return eq(rcv.cmd, expected.c_str()) && rcv.cmd_seq() == snd.cmd_seq();
+  }
+
+  /* Rozpoznawanie listy serwerów w grupie */
   constexpr char hello[] = "HELLO"; /* client, simpl */
   constexpr char good_day[] ="GOOD_DAY"; /* server, cmplx[free space, MCAST_ADDR] */
 
-/* Przeglądanie listy plików i wyszukiwanie na serwerach w grupie */
+  /* Przeglądanie listy plików i wyszukiwanie na serwerach w grupie */
   constexpr char list[] = "LIST"; /* client, simpl[if data is not empty => search file] */
   constexpr char my_list[] = "MY_LIST"; /* server, simpl[filelist] */
 
-/* Pobieranie pliku z serwera */
+  /* Pobieranie pliku z serwera */
   constexpr char get[] = "GET"; /* client, simpl[filename] */
   constexpr char connect_me[] = "CONNECT_ME"; /* server, cmplx[port TCP, filename] */
 
-/* Usuwanie pliku z serwera */
+  /* Usuwanie pliku z serwera */
   constexpr char del[] = "DEL"; /* client, simpl[filename] */
 
-/* Dodawanie pliku do grupy */
+  /* Dodawanie pliku do grupy */
   constexpr char add[] = "ADD"; /* client, cmplx[size, filename] */
   constexpr char no_way[] = "NO_WAY"; /* server, simpl[filename] */
   constexpr char can_add[] = "CAN_ADD"; /* server, cmplx[port TCP, {}] */

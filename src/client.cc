@@ -96,92 +96,11 @@ class client {
  private:
   void set_target();
 
-  void discover() {
-    printf("Sending request...\n");
-    cmd::simple simple { cmd::hello, 10 };
+  void discover();
 
-    udp.send(simple, remote_address);
+  void search(const std::string& pattern);
 
-    socklen_t remote_len = sizeof(struct sockaddr_in);
-    ssize_t rcv_len = 0;
-    struct sockaddr_in ra{};
-
-    while (rcv_len >= 0) {
-      printf("Waiting for response...\n");
-      cmd::complex complex;
-      rcv_len = udp.recv(complex, ra);
-      if (rcv_len >= 0 && cmd::eq(complex.cmd, cmd::good_day) && complex.cmd_seq() == simple.cmd_seq()) {
-        std::cout << "Found " << inet_ntoa(ra.sin_addr) << " (" << complex.data << ") with free space " << complex.param() << std::endl;
-      }
-    }
-    printf("Didn't get any response. Break request.\n");
-  }
-
-  void search(const std::string& pattern) {
-    printf("Sending request...\n");
-    files.clear();
-    cmd::simple simple { cmd::list, 10, pattern.data() };
-
-    udp.send(simple, remote_address);
-
-    socklen_t remote_len = sizeof(struct sockaddr_in);
-    ssize_t rcv_len = 0;
-    struct sockaddr_in ra{};
-
-    while (rcv_len >= 0) {
-      printf("Waiting for response...\n");
-      memset(&simple, 0, sizeof(simple));
-      rcv_len = udp.recv(simple, ra);
-      if (rcv_len >= 0) {
-        printf("address: %s:%d\n", inet_ntoa(ra.sin_addr),
-               ntohs(ra.sin_port));
-        if (cmd::eq(simple.cmd, cmd::my_list) && simple.cmd_seq() == simple.cmd_seq()) {
-          std::string list(simple.data);
-          size_t offset = 0;
-          size_t N = list.length();
-          while (offset < N) {
-            size_t start = offset;
-            offset = list.find('\n', start) + 1;
-            size_t end = offset - 1;
-            if (offset - 1 == std::string::npos) {
-              end = offset = N;
-            }
-            std::string filename(simple.data + start, simple.data + end);
-            files[filename] = std::string(inet_ntoa(ra.sin_addr));
-            std::cout << filename << " (" << inet_ntoa(ra.sin_addr) << ")" << std::endl;
-          }
-        } else {
-          // TODO error
-        }
-      }
-    }
-    printf("Didn't get any response. Break request.\n");
-  }
-
-  void fetch(const std::string& param) {
-    if (files.find(param) != files.end()) {
-      auto server_address = remote_address;
-      if (inet_aton(files[param].c_str(), &server_address.sin_addr) == 0)
-        throw std::runtime_error("inet_aton");
-
-      printf("Sending request...\n");
-      cmd::simple simple { cmd::get, 10, param.data() };
-      udp.send(simple, server_address);
-
-      ssize_t rcv_len = 0;
-      printf("Waiting for response...\n");
-      cmd::complex complex;
-      rcv_len = udp.recv(complex, server_address);
-
-      if (rcv_len >= 0 && cmd::eq(complex.cmd, cmd::connect_me) && complex.cmd_seq() == simple.cmd_seq()) {
-        std::cout << "Connect_me " << inet_ntoa(server_address.sin_addr) << ":" << complex.param() << " (" << complex.data << ")" << std::endl;
-      } else {
-        std::cout << "blad" << std::endl;
-      }
-    } else {
-      std::cout << "nie ma pliku" << std::endl;
-    }
-  }
+  void fetch(const std::string& param);
 
   std::string remote_dotted_address;
   in_port_t remote_port;
@@ -189,6 +108,91 @@ class client {
   std::unordered_map<std::string, std::string> files;
   sockets::udp udp;
 };
+
+void client::discover() {
+  printf("Sending request...\n");
+  cmd::simple simple { cmd::hello, 10 };
+
+  udp.send(simple, remote_address);
+
+  ssize_t rcv_len = 0;
+  struct sockaddr_in ra{};
+
+  while (rcv_len >= 0) {
+    printf("Waiting for response...\n");
+    cmd::complex complex;
+    rcv_len = udp.recv(complex, ra);
+    if (rcv_len >= 0 && cmd::validate(complex, simple, cmd::good_day)) {
+      std::cout << "Found " << inet_ntoa(ra.sin_addr) << " (" << complex.data << ") with free space " << complex.param() << std::endl;
+    }
+  }
+  printf("Didn't get any response. Break request.\n");
+}
+
+void client::search(const std::string& pattern) {
+  printf("Sending request...\n");
+  files.clear();
+  cmd::simple simple { cmd::list, 10, pattern.data() };
+
+  udp.send(simple, remote_address);
+
+  ssize_t rcv_len = 0;
+  struct sockaddr_in ra{};
+
+  while (rcv_len >= 0) {
+    printf("Waiting for response...\n");
+    cmd::simple rcved;
+    rcv_len = udp.recv(rcved, ra);
+    if (rcv_len >= 0) {
+      printf("address: %s:%d\n", inet_ntoa(ra.sin_addr),
+             ntohs(ra.sin_port));
+      if (cmd::validate(rcved, simple, cmd::my_list)) {
+        std::string list(rcved.data);
+        size_t offset = 0;
+        size_t N = list.length();
+        while (offset < N) {
+          size_t start = offset;
+          offset = list.find('\n', start) + 1;
+          size_t end = offset - 1;
+          if (offset - 1 == std::string::npos) {
+            end = offset = N;
+          }
+          std::string filename(rcved.data + start, rcved.data + end);
+          files[filename] = std::string(inet_ntoa(ra.sin_addr));
+          std::cout << filename << " (" << inet_ntoa(ra.sin_addr) << ")" << std::endl;
+        }
+      } else {
+        // TODO error
+      }
+    }
+  }
+  printf("Didn't get any response. Break request.\n");
+}
+
+void client::fetch(const std::string& param) {
+  if (files.find(param) != files.end()) {
+    auto server_address = remote_address;
+    if (inet_aton(files[param].c_str(), &server_address.sin_addr) == 0)
+      throw std::runtime_error("inet_aton");
+
+    printf("Sending request...\n");
+    cmd::simple simple { cmd::get, 10, param.data() };
+    udp.send(simple, server_address);
+
+    ssize_t rcv_len = 0;
+    printf("Waiting for response...\n");
+    cmd::complex complex;
+    rcv_len = udp.recv(complex, server_address);
+
+    if (rcv_len >= 0 && cmd::validate(complex, simple, cmd::connect_me)) {
+      std::cout << "Connect_me " << inet_ntoa(server_address.sin_addr) << ":" << complex.param() << " (" << complex.data << ")" << std::endl;
+    } else {
+      std::cout << "blad" << std::endl;
+    }
+  } else {
+    std::cout << "nie ma pliku" << std::endl;
+  }
+}
 
 void client::connect() {
   udp.set_broadcast();
@@ -232,7 +236,7 @@ void client::set_target() {
     throw std::runtime_error("inet_aton");
 }
 
-}
+} // namespace netstore
 
 int main(int ac, char** av) {
   namespace bpo = boost::program_options;
