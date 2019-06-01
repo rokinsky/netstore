@@ -33,11 +33,11 @@ namespace netstore::sockets {
   }
 
   void udp::bind_local(in_port_t port) {
-    struct sockaddr_in local_address = {};
+    sockaddr_in local_address = {};
     local_address.sin_family = AF_INET;
     local_address.sin_addr.s_addr = htonl(INADDR_ANY);
     local_address.sin_port = htons(port);
-    if (bind(sock, (struct sockaddr *) &local_address, sizeof local_address) < 0)
+    if (bind(sock, (sockaddr *) &local_address, sizeof local_address) < 0)
       throw exception("udp::bind");
   }
 
@@ -72,8 +72,8 @@ namespace netstore::sockets {
   }
 
   void udp::set_timeout(__time_t sec, __suseconds_t usec) {
-    struct timeval tv {sec, usec};
-    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(struct timeval));
+    timeval tv {sec, usec};
+    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(timeval));
   }
 
   tcp::tcp() : sock(0) { open(); }
@@ -85,11 +85,11 @@ namespace netstore::sockets {
   }
 
   tcp tcp::accept() {
-    struct sockaddr_in client_address{};
+    sockaddr_in client_address{};
     socklen_t client_address_len = sizeof(client_address);
 
     int msg_sock =
-        ::accept(sock, (struct sockaddr*)&client_address, &client_address_len);
+        ::accept(sock, (sockaddr*)&client_address, &client_address_len);
     if (msg_sock < 0) {
       throw exception("tcp::accept");
     }
@@ -98,11 +98,11 @@ namespace netstore::sockets {
   }
 
   void tcp::bind(in_port_t port) {
-    struct sockaddr_in sa{};
+    sockaddr_in sa{};
     sa.sin_family = AF_INET;
     sa.sin_addr = {.s_addr = htonl(INADDR_ANY)};
     sa.sin_port = port;
-    if (::bind(sock, (struct sockaddr *) &sa, sizeof(sa)) < 0)
+    if (::bind(sock, (sockaddr *) &sa, sizeof(sa)) < 0)
       throw exception("tcp::bind");
   }
 
@@ -112,22 +112,22 @@ namespace netstore::sockets {
   }
 
   void tcp::connect(const std::string& addr, in_port_t port) {
-    struct sockaddr_in sa{};
+    sockaddr_in sa{};
     sa.sin_port = port;
     sa.sin_family = AF_INET;
     if (inet_aton(addr.c_str(), &sa.sin_addr) == 0)
       throw exception("udp::inet_aton");
 
-    socklen_t addr_len = sizeof(struct sockaddr_in);
+    socklen_t addr_len = sizeof(sockaddr_in);
 
-    if (::connect(sock, (struct sockaddr *) &sa, addr_len) < 0)
+    if (::connect(sock, (sockaddr *) &sa, addr_len) < 0)
       throw exception("tcp::connect");
   }
 
   in_port_t tcp::port() {
-    struct sockaddr_in addr{};
-    socklen_t addrlen = sizeof(struct sockaddr_in);
-    if (getsockname(sock, (struct sockaddr*) &addr, &addrlen) < 0)
+    sockaddr_in addr{};
+    socklen_t addrlen = sizeof(sockaddr_in);
+    if (getsockname(sock, (sockaddr*) &addr, &addrlen) < 0)
       throw exception("tcp::getsockname");
 
     return addr.sin_port;

@@ -56,15 +56,15 @@ class server {
 
   std::unordered_map<std::string, uint64_t> files;
 
-  void hello(struct sockaddr_in& ra, uint64_t cmd_seq);
-  void list(struct sockaddr_in& ra, uint64_t cmd_seq, const std::string& s);
-  void get(struct sockaddr_in& ra, uint64_t cmd_seq, const std::string& s);
+  void hello(sockaddr_in& ra, uint64_t cmd_seq);
+  void list(sockaddr_in& ra, uint64_t cmd_seq, const std::string& s);
+  void get(sockaddr_in& ra, uint64_t cmd_seq, const std::string& s);
   void del();
   void add();
 
   uint64_t index_files();
 
-  ssize_t read_cmd(cmd::simple& cmd, struct sockaddr_in& remote);
+  ssize_t read_cmd(cmd::simple& cmd, sockaddr_in& remote);
 };
 
 uint64_t server::index_files() {
@@ -81,19 +81,19 @@ uint64_t server::index_files() {
   return total_size;
 }
 
-ssize_t server::read_cmd(cmd::simple& cmd, struct sockaddr_in& remote) {
+ssize_t server::read_cmd(cmd::simple& cmd, sockaddr_in& remote) {
   ssize_t rcv_len = udp.recv(cmd, remote);
   if (rcv_len < 0)
     throw exception("read");
   return rcv_len;
 }
 
-void server::hello(struct sockaddr_in& ra, uint64_t cmd_seq) {
+void server::hello(sockaddr_in& ra, uint64_t cmd_seq) {
   cmd::complex complex(cmd::good_day, cmd_seq, available_space, mcast_addr.c_str());
   udp.send(complex, ra);
 }
 
-void server::list(struct sockaddr_in& ra, uint64_t cmd_seq, const std::string& s) {
+void server::list(sockaddr_in& ra, uint64_t cmd_seq, const std::string& s) {
   std::string list;
   std::cout << "searching for " << s << std::endl;
   for (const auto &[k, v]: files) {
@@ -112,7 +112,7 @@ void server::list(struct sockaddr_in& ra, uint64_t cmd_seq, const std::string& s
   }
 }
 
-void server::get(struct sockaddr_in& ra, uint64_t cmd_seq, const std::string& s) {
+void server::get(sockaddr_in& ra, uint64_t cmd_seq, const std::string& s) {
   if (s.empty() || s.find('/', 0) != std::string::npos)
     return;
 
@@ -146,7 +146,7 @@ void server::get(struct sockaddr_in& ra, uint64_t cmd_seq, const std::string& s)
 void server::run() {
   for (auto i = 0; i < REPEAT_COUNT; ++i) {
     cmd::simple simple;
-    struct sockaddr_in remote_address{};
+    sockaddr_in remote_address{};
     ssize_t rcv_len = read_cmd(simple, remote_address);
 
     printf("address: %s %d\n", inet_ntoa(remote_address.sin_addr),

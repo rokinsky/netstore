@@ -72,7 +72,6 @@ Lubię to!
 #include "aux.hh"
 #include "cmd.hh"
 
-#define BSIZE         256
 #define TTL_VALUE     4
 #define REPEAT_COUNT  3
 
@@ -80,10 +79,10 @@ namespace netstore {
 
 class client {
  public:
-   client(std::string mcast_addr, in_port_t cmd_port, std::string of, uint8_t t)
-    : mcast_addr(std::move(mcast_addr))
-    , cmd_port(cmd_port)
-    , remote_address({})
+   client(std::string ma, in_port_t cp, std::string of, uint8_t t)
+    : mcast_addr(std::move(ma))
+    , cmd_port(cp)
+    , mcast_sockaddr({})
     , out_fldr(std::move(of))
     , timeout(t)
     , udp(0)
@@ -105,7 +104,7 @@ class client {
 
   std::string mcast_addr;
   in_port_t cmd_port;
-  struct sockaddr_in remote_address;
+  sockaddr_in mcast_sockaddr;
   std::string out_fldr;
   uint8_t timeout;
   sockets::udp udp;
@@ -116,10 +115,10 @@ void client::discover() {
   printf("Sending request...\n");
   cmd::simple simple { cmd::hello, 10 };
 
-  udp.send(simple, remote_address);
+  udp.send(simple, mcast_sockaddr);
 
   ssize_t rcv_len = 0;
-  struct sockaddr_in ra{};
+  sockaddr_in ra{};
 
   while (rcv_len >= 0) {
     printf("Waiting for response...\n");
@@ -137,10 +136,10 @@ void client::search(const std::string& pattern) {
   files.clear();
   cmd::simple simple { cmd::list, 10, pattern.data() };
 
-  udp.send(simple, remote_address);
+  udp.send(simple, mcast_sockaddr);
 
   ssize_t rcv_len = 0;
-  struct sockaddr_in ra{};
+  sockaddr_in ra{};
 
   while (rcv_len >= 0) {
     printf("Waiting for response...\n");
@@ -178,7 +177,7 @@ void client::fetch(const std::string& param) {
     return;
   }
 
-  auto server_address = remote_address;
+  auto server_address = mcast_sockaddr;
   if (inet_aton(files[param].c_str(), &server_address.sin_addr) == 0)
     throw std::runtime_error("inet_aton");
 
@@ -255,9 +254,9 @@ void client::run() {
 }
 
 void client::set_target() {
-  remote_address.sin_family = AF_INET;
-  remote_address.sin_port = htons(cmd_port);
-  if (inet_aton(mcast_addr.c_str(), &remote_address.sin_addr) == 0)
+  mcast_sockaddr.sin_family = AF_INET;
+  mcast_sockaddr.sin_port = htons(cmd_port);
+  if (inet_aton(mcast_addr.c_str(), &mcast_sockaddr.sin_addr) == 0)
     throw std::runtime_error("inet_aton");
 }
 

@@ -12,7 +12,7 @@ namespace netstore::sockets {
 
 class udp {
  private:
-  struct ip_mreq ip_mreq;
+  ip_mreq ip_mreq;
   int sock;
 
   void open();
@@ -22,7 +22,7 @@ class udp {
  public:
   udp(const std::string &addr, in_port_t port);
 
-  udp(in_port_t port);
+  explicit udp(in_port_t port);
 
   udp();
 
@@ -41,20 +41,20 @@ class udp {
   void set_timeout(__time_t sec, __suseconds_t usec);
 
   template<typename C>
-  void send(C &msg, struct sockaddr_in &ra) {
-    if (sendto(sock, &msg, msg.size(), 0, (struct sockaddr *) &ra,
+  void send(C &msg, sockaddr_in &ra) {
+    if (sendto(sock, &msg, msg.size(), 0, (sockaddr *) &ra,
                sizeof(ra)) != msg.size())
       throw exception("udp::send");
   }
 
   template<typename C>
-  ssize_t recv(C &msg, struct sockaddr_in &ra) {
+  ssize_t recv(C &msg, sockaddr_in &ra) {
     ssize_t rcv_len = 0;
-    socklen_t remote_len = sizeof(struct sockaddr_in);
-    rcv_len = recvfrom(sock, &msg, sizeof(msg), 0, (struct sockaddr *) &ra,
+    socklen_t remote_len = sizeof(sockaddr_in);
+    rcv_len = recvfrom(sock, &msg, sizeof(msg), 0, (sockaddr *) &ra,
                        &remote_len);
     if (rcv_len < 0)
-      //throw exception("udp::recv");
+      //TODO throw exception("udp::recv");
       std::cout << "udp::recv" << std::endl;
     return rcv_len;
   }
@@ -62,10 +62,10 @@ class udp {
 
 class tcp {
  public:
-  static constexpr size_t buffer_size = 1024 * 512;
+  static constexpr size_t buffer_size = 4096 * 512; /* 2 MiB */
 
   tcp();
-  tcp(uint32_t sock);
+  explicit tcp(uint32_t sock);
 
   void open();
 
