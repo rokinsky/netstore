@@ -12,7 +12,7 @@ namespace netstore::sockets {
 
 class udp {
  private:
-  ip_mreq ip_mreq;
+  ::ip_mreq ip_mreq;
   int sock;
 
   void open();
