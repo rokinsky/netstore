@@ -191,18 +191,25 @@ void client::fetch(const std::string& param) {
     if (rcv_len >= 0 && cmd::validate(complex, simple, cmd::connect_me)) {
       std::cout << "Connect_me " << inet_ntoa(server_address.sin_addr) << ":" << complex.param() << " (" << complex.data << ")" << std::endl;
 
-      sockets::tcp tcp;
+      std::ofstream file;
+      file.open(out_fldr + '/' + complex.data, std::ios::binary | std::ios::out | std::ios::trunc);
 
-      tcp.connect(files[param], complex.param());
+      if (file.is_open()) {
+        sockets::tcp tcp;
+        tcp.connect(files[param], complex.param());
 
-      tcp.write("hello from client");
+        tcp.write("hello from client");
 
-      std::string msg;
+        ssize_t nread;
+        while ((nread = tcp.read()) > 0) {
+          file.write(tcp.buffer(), nread);
+          std::cout << "tcp readed: " << tcp.buffer() << "(" << nread << ")" << std::endl;
+        }
 
-      auto nread = tcp.read(msg);
+        //auto nread = tcp.read(msg);
 
-      std::cout << "tcp readed: " << msg << "(" << nread << ")"<< std::endl;
-
+        file.close();
+      }
     } else {
       std::cout << "blad" << std::endl;
     }

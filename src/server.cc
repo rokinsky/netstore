@@ -122,10 +122,9 @@ void server::get(struct sockaddr_in& ra, uint64_t cmd_seq, const std::string& s)
 
   auto msg_tcp = tcp.accept();
 
-  std::string msg;
-  auto nread = msg_tcp.read(msg);
+  auto nread = msg_tcp.read();
 
-  std::cout << "tcp readed: " << msg << "(" << nread << ")"<< std::endl;
+  std::cout << "tcp readed: " << msg_tcp.buffer() << "(" << nread << ")"<< std::endl;
 
   msg_tcp.write("hello from server");
   // listen on socket

@@ -82,10 +82,13 @@ class tcp {
   in_port_t port();
 
   void write(const std::string& msg);
-  ssize_t read(std::string& msg);
+  ssize_t read();
+
+  char* buffer();
  private:
   int sock;
-  struct addrinfo *addr_result;
+  static constexpr size_t buffer_size = 1024 * 512;
+  char _buffer[buffer_size];
 };
 
 }

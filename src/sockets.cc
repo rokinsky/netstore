@@ -76,13 +76,12 @@ namespace netstore::sockets {
     setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(struct timeval));
   }
 
-  tcp::tcp() : sock(0), addr_result(nullptr) { open(); }
+  tcp::tcp() : sock(0) { open(); }
 
-  tcp::tcp(uint32_t sock) : sock(sock), addr_result(nullptr) {}
+  tcp::tcp(uint32_t sock) : sock(sock) {}
 
   tcp::~tcp() {
     close();
-    if (addr_result != nullptr) freeaddrinfo(addr_result);
   }
 
   tcp tcp::accept() {
@@ -113,7 +112,6 @@ namespace netstore::sockets {
   }
 
   void tcp::connect(const std::string& addr, in_port_t port) {
-    //convert(addr, port);
     struct sockaddr_in sa{};
     sa.sin_port = port;
     sa.sin_family = AF_INET;
@@ -121,9 +119,6 @@ namespace netstore::sockets {
       throw exception("udp::inet_aton");
 
     socklen_t addr_len = sizeof(struct sockaddr_in);
-
-/*    if (::connect(sock, addr_result->ai_addr, addr_result->ai_addrlen) < 0)
-      throw exception("tcp::connect");*/
 
     if (::connect(sock, (struct sockaddr *) &sa, addr_len) < 0)
       throw exception("tcp::connect");
@@ -152,11 +147,15 @@ namespace netstore::sockets {
       throw exception("tcp::write");
   }
 
-  ssize_t tcp::read(std::string& msg) {
-    char res[256];
-    ssize_t nread = ::read(sock, &res, 256);
+  /* only sequence read */
+  ssize_t tcp::read() {
+    bzero(_buffer, buffer_size);
+    ssize_t nread = ::read(sock, &_buffer, buffer_size);
     if (nread < 0) throw exception("tcp::read");
-    msg = std::string(res);
     return nread;
+  }
+
+  char* tcp::buffer() {
+    return _buffer;
   }
 }
