@@ -65,9 +65,10 @@ Lubię to!
 #include <regex>
 #include <unordered_map>
 
-#include "helper.hh"
+#include "common.hh"
 #include "sockets.hh"
 #include "aux.hh"
+#include "cmd.hh"
 
 #define BSIZE         256
 #define TTL_VALUE     4

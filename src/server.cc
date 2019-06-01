@@ -9,13 +9,14 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include "helper.hh"
+#include "common.hh"
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/time.h>
 
 #include "sockets.hh"
 #include "aux.hh"
+#include "cmd.hh"
 
 #define MAX_UDP 65507
 #define BSIZE         1024
@@ -73,8 +74,7 @@ class server {
     return total_size;
   }
 
-  ssize_t read_cmd(cmd::simple& cmd, struct sockaddr_in& remote, socklen_t& remote_len) {
-    remote_len = sizeof(struct sockaddr_in); /* WARNING !!! */
+  ssize_t read_cmd(cmd::simple& cmd, struct sockaddr_in& remote) {
     ssize_t rcv_len = udp.recv(cmd, remote);
     if (rcv_len < 0)
       throw exception("read");
@@ -122,8 +122,7 @@ void server::run() {
   for (auto i = 0; i < REPEAT_COUNT; ++i) {
     cmd::simple simple;
     struct sockaddr_in remote_address{};
-    socklen_t remote_len;
-    ssize_t rcv_len = read_cmd(simple, remote_address, remote_len);
+    ssize_t rcv_len = read_cmd(simple, remote_address);
 
     printf("address: %s %d\n", inet_ntoa(remote_address.sin_addr),
            ntohs(remote_address.sin_port));

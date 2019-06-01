@@ -12,6 +12,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -Wextra -O2 -std=c++17 -l stdc+
 
 add_library(nssockets src/sockets.cc)
 add_library(nsaux src/aux.cc)
+add_library(nscmd src/cmd.cc)
 target_link_libraries(nsaux stdc++fs)
 
 # http://stackoverflow.com/questions/10555706/
@@ -20,12 +21,12 @@ macro (add_executable _name)
     _add_executable(${ARGV})
     if (TARGET ${_name})
         target_link_libraries(${_name} ${CMAKE_THREAD_LIBS_INIT}
-                ${Boost_LIBRARIES} stdc++fs nssockets nsaux)
+                ${Boost_LIBRARIES} stdc++fs nssockets nsaux nscmd)
     endif()
 endmacro()
 
-add_executable(netstore-server src/netstore-server.cc)
-add_executable(netstore-client src/netstore-client.cc)
+add_executable(netstore-server src/server.cc)
+add_executable(netstore-client src/client.cc)
 
 
 install(TARGETS DESTINATION .)
