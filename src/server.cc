@@ -113,13 +113,21 @@ void server::list(struct sockaddr_in& ra, uint64_t cmd_seq, const std::string& s
 
 void server::get(struct sockaddr_in& ra, uint64_t cmd_seq, const std::string& s) {
   // open socket
-  int sock_tcp = socket(PF_INET, SOCK_STREAM, 0); // creating IPv4 TCP socket
-  if (sock_tcp < 0)
-    throw exception("socket");
-
-  cmd::complex complex(cmd::connect_me, cmd_seq, 11111, s.data());
+  sockets::tcp tcp;
+  tcp.bind();
+  auto port = tcp.port();
+  tcp.listen();
+  cmd::complex complex(cmd::connect_me, cmd_seq, port, s.data());
   udp.send(complex, ra);
 
+  auto msg_tcp = tcp.accept();
+
+  std::string msg;
+  auto nread = msg_tcp.read(msg);
+
+  std::cout << "tcp readed: " << msg << "(" << nread << ")"<< std::endl;
+
+  msg_tcp.write("hello from server");
   // listen on socket
 }
 

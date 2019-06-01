@@ -90,9 +90,7 @@ class client {
     , udp(0)
    {}
 
-   ~client() {
-     udp.unset_multicast();
-   }
+   //~client();
 
    void connect();
    void run();
@@ -192,6 +190,19 @@ void client::fetch(const std::string& param) {
 
     if (rcv_len >= 0 && cmd::validate(complex, simple, cmd::connect_me)) {
       std::cout << "Connect_me " << inet_ntoa(server_address.sin_addr) << ":" << complex.param() << " (" << complex.data << ")" << std::endl;
+
+      sockets::tcp tcp;
+
+      tcp.connect(files[param], complex.param());
+
+      tcp.write("hello from client");
+
+      std::string msg;
+
+      auto nread = tcp.read(msg);
+
+      std::cout << "tcp readed: " << msg << "(" << nread << ")"<< std::endl;
+
     } else {
       std::cout << "blad" << std::endl;
     }
@@ -199,6 +210,8 @@ void client::fetch(const std::string& param) {
     std::cout << "nie ma pliku" << std::endl;
   }
 }
+
+//client::~client();
 
 void client::connect() {
   udp.set_broadcast();

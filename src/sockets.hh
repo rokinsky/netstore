@@ -4,17 +4,16 @@
 #include <bits/types.h>
 #include <string>
 #include <netinet/in.h>
+#include <netdb.h>
 #include "common.hh"
+#include <sys/socket.h>
 
 namespace netstore::sockets {
 
-/*template <typename C>*/
 class udp {
- public:
-  int sock;
-
  private:
   struct ip_mreq ip_mreq;
+  int sock;
 
   void open();
 
@@ -41,9 +40,6 @@ class udp {
 
   void set_timeout(__time_t sec, __suseconds_t usec);
 
-/*  void send(C& msg, struct sockaddr_in& ra);
-ssize_t recv(C& msg, struct sockaddr_in& ra);*/
-
   template<typename C>
   void send(C &msg, struct sockaddr_in &ra) {
     if (sendto(sock, &msg, msg.size(), 0, (struct sockaddr *) &ra,
@@ -62,8 +58,36 @@ ssize_t recv(C& msg, struct sockaddr_in& ra);*/
       std::cout << "udp::recv" << std::endl;
     return rcv_len;
   }
-
 };
+
+class tcp {
+ public:
+  tcp();
+  tcp(uint32_t sock);
+
+  void open();
+
+  void close();
+
+  ~tcp();
+
+  tcp accept();
+
+  void bind(in_port_t port = 0);
+
+  void listen(uint8_t queue_length = 5);
+
+  void connect(const std::string& addr, in_port_t port);
+
+  in_port_t port();
+
+  void write(const std::string& msg);
+  ssize_t read(std::string& msg);
+ private:
+  int sock;
+  struct addrinfo *addr_result;
+};
+
 }
 
 #endif //NETSTORE_2_SOCKETS_HH

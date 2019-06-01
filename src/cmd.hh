@@ -10,7 +10,7 @@ namespace netstore::cmd {
   constexpr size_t max_cmlpx_data = max_udp - max_cmd - 2 * sizeof(uint64_t);
 
   inline bool eq(const char* a, const char* b) {
-    return strncmp(a, b, max_cmd) == 0;
+    return strncmp(a, b, max_cmd) == 0; // TODO: memcpy !!!
   }
 
   template <typename A, typename B>
