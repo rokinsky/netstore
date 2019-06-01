@@ -66,6 +66,8 @@ Lubię to!
 #include <unordered_map>
 
 #include "helper.hh"
+#include "sockets.hh"
+#include "aux.hh"
 
 #define BSIZE         256
 #define TTL_VALUE     4
@@ -73,40 +75,31 @@ Lubię to!
 #define SLEEP_TIME    5
 
 namespace netstore {
+
 class client {
  public:
    client(std::string address, in_port_t port)
    : remote_dotted_address(std::move(address))
    , remote_port(port)
-   , sock(0)
    , remote_address({})
+   , udp(0)
    {}
 
    ~client() {
-     close();
+     udp.unset_multicast();
    }
 
    void connect();
    void run();
 
  private:
-  void open_socket();
-  void set_broadcast();
-  void set_ttl();
-  void bind_local();
   void set_target();
-  void set_timeout();
-  void close();
 
   void discover() {
-
     printf("Sending request...\n");
-/*    char buffer[BSIZE];
-    bzero(buffer, BSIZE);*/
     cmd::simple simple { cmd::hello, 10 };
 
-    if (sendto(sock, &simple, simple.size(), 0, (struct sockaddr*) &remote_address, sizeof(remote_address)) != simple.size())
-      throw std::runtime_error("write");
+    udp.send(simple, remote_address);
 
     socklen_t remote_len = sizeof(struct sockaddr_in);
     ssize_t rcv_len = 0;
@@ -115,10 +108,9 @@ class client {
     while (rcv_len >= 0) {
       printf("Waiting for response...\n");
       cmd::complex complex;
-      rcv_len = recvfrom(sock, &complex, sizeof(complex), 0, (struct sockaddr*) &ra, &remote_len);
+      rcv_len = udp.recv(complex, ra);
       if (rcv_len >= 0 && cmd::eq(complex.cmd, cmd::good_day) && complex.cmd_seq() == simple.cmd_seq()) {
         std::cout << "Found " << inet_ntoa(ra.sin_addr) << " (" << complex.data << ") with free space " << complex.param() << std::endl;
-        //std::cout << complex.to_string() << std::endl;
       }
     }
     printf("Didn't get any response. Break request.\n");
@@ -128,8 +120,8 @@ class client {
     printf("Sending request...\n");
     files.clear();
     cmd::simple simple { cmd::list, 10, pattern.data() };
-    if (sendto(sock, &simple, simple.size(), 0, (struct sockaddr*) &remote_address, sizeof(remote_address)) != simple.size())
-      throw std::runtime_error("write");
+
+    udp.send(simple, remote_address);
 
     socklen_t remote_len = sizeof(struct sockaddr_in);
     ssize_t rcv_len = 0;
@@ -138,7 +130,7 @@ class client {
     while (rcv_len >= 0) {
       printf("Waiting for response...\n");
       memset(&simple, 0, sizeof(simple));
-      rcv_len = recvfrom(sock, &simple, sizeof(simple), 0, (struct sockaddr *) &ra, &remote_len);
+      rcv_len = udp.recv(simple, ra);
       if (rcv_len >= 0) {
         printf("address: %s:%d\n", inet_ntoa(ra.sin_addr),
                ntohs(ra.sin_port));
@@ -173,14 +165,13 @@ class client {
 
       printf("Sending request...\n");
       cmd::simple simple { cmd::get, 10, param.data() };
-      if (sendto(sock, &simple, simple.size(), 0, (struct sockaddr*) &server_address, sizeof(server_address)) != simple.size())
-        throw std::runtime_error("write");
+      udp.send(simple, server_address);
 
-      socklen_t remote_len;
       ssize_t rcv_len = 0;
       printf("Waiting for response...\n");
       cmd::complex complex;
-      rcv_len = recvfrom(sock, &complex, sizeof(complex), 0, (struct sockaddr*) &server_address, &remote_len);
+      rcv_len = udp.recv(complex, server_address);
+
       if (rcv_len >= 0 && cmd::eq(complex.cmd, cmd::connect_me) && complex.cmd_seq() == simple.cmd_seq()) {
         std::cout << "Connect_me " << inet_ntoa(server_address.sin_addr) << ":" << complex.param() << " (" << complex.data << ")" << std::endl;
       } else {
@@ -193,55 +184,17 @@ class client {
 
   std::string remote_dotted_address;
   in_port_t remote_port;
-  int sock;
   struct sockaddr_in remote_address;
   std::unordered_map<std::string, std::string> files;
-
-
-  inline bool is_discover(const std::string& s) {
-    return s == "discover";
-  }
-
-  inline bool is_search(const std::string& s, std::string& param) {
-    std::smatch match;
-    auto is_match = std::regex_match(s, std::regex("^search( |( (.*))?)"));
-
-    if (is_match)
-      param = s.substr(std::min<size_t>(strlen("search "), s.length()));
-
-    return is_match;
-  }
-
-  inline bool is_fetch(const std::string& s, std::string& param) {
-    std::smatch match;
-    auto is_match = std::regex_match(s, std::regex("^fetch( (.+)){1}"));
-
-    if (is_match)
-      param = s.substr(std::min<size_t>(strlen("fetch "), s.length()));
-
-    return is_match;
-  }
-
-  inline bool is_upload(const std::string& s) {
-    return std::regex_match(s, std::regex("^upload(\\s\\w+)+"));
-  }
-
-  inline bool is_remove(const std::string& s) {
-    return std::regex_match(s, std::regex("^remove(\\s\\w+)+"));
-  }
-
-  inline bool is_exit(const std::string& s) {
-    return s == "exit";
-  }
+  sockets::udp udp;
 };
 
 void client::connect() {
-  open_socket();
-  set_broadcast();
-  set_ttl();
-  bind_local();
+  udp.set_broadcast();
+  udp.set_ttl(TTL_VALUE);
+  udp.set_timeout(SLEEP_TIME, 0);
+
   set_target();
-  set_timeout();
 }
 
 void client::run() {
@@ -249,54 +202,26 @@ void client::run() {
   std::string line;
   std::getline(std::cin, line);
 
-  while(!is_exit(line)) {
+  while(!aux::is_exit(line)) {
     std::string param;
-    if (is_discover(line)) {
+    if (aux::is_discover(line)) {
       std::cout << "!!discover" << std::endl;
       discover();
-    } else if (is_search(line, param)) {
+    } else if (aux::is_search(line, param)) {
       std::cout << "!!searched word: " << param << std::endl;
       search(param);
-    } else if (is_fetch(line, param)) {
+    } else if (aux::is_fetch(line, param)) {
       std::cout << "!!fetch" << std::endl;
       fetch(param);
-    } else if (is_upload(line)) {
+    } else if (aux::is_upload(line)) {
       std::cout << "!!upload" << std::endl;
-    } else if (is_remove(line)) {
+    } else if (aux::is_remove(line)) {
       std::cout << "!!remove" << std::endl;
     }
     std::cout << line << std::endl;
     std::getline(std::cin, line);
   }
   printf("Closing.\n");
-  close();
-}
-
-void client::open_socket() {
-  sock = socket(AF_INET, SOCK_DGRAM, 0);
-  if (sock < 0)
-    throw std::runtime_error("socket");
-}
-
-void client::set_broadcast() {
-  int optval = 1;
-  if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, (void*)&optval, sizeof optval) < 0)
-    throw std::runtime_error("setsockopt broadcast");
-}
-
-void client::set_ttl() {
-  int optval = TTL_VALUE;
-  if (setsockopt(sock, IPPROTO_IP, IP_MULTICAST_TTL, (void*)&optval, sizeof optval) < 0)
-    throw std::runtime_error("setsockopt multicast ttl");
-}
-
-void client::bind_local() {
-  struct sockaddr_in local_address{};
-  local_address.sin_family = AF_INET;
-  local_address.sin_addr.s_addr = htonl(INADDR_ANY);
-  local_address.sin_port = htons(0);
-  if (bind(sock, (struct sockaddr *)&local_address, sizeof local_address) < 0)
-    throw std::runtime_error("bind");
 }
 
 void client::set_target() {
@@ -306,14 +231,6 @@ void client::set_target() {
     throw std::runtime_error("inet_aton");
 }
 
-void client::set_timeout() {
-  struct timeval tv {5, 0};
-  setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(struct timeval));
-}
-
-void client::close() {
-  ::close(sock);
-}
 }
 
 int main(int ac, char** av) {
@@ -322,35 +239,6 @@ int main(int ac, char** av) {
   netstore::client c(av[1], (in_port_t)atoi(av[2]));
   c.connect();
   c.run();
-
-/*
-  // create and open a character archive for output
-  std::ofstream ofs("filename");
-
-  // create class instance
-  const netstore::cmd::simple g("GET_TIME", 59, "DATA");
-
-  // save data to archive
-  {
-    boost::archive::text_oarchive oa(std::cout);
-    // write class instance to archive
-    oa << g;
-    // archive and stream closed when destructors are called
-  }
-  std::cout << "Asd";
-
-  // ... some time later restore the class instance to its orginal state
-  netstore::cmd::simple newg;
-  {
-    // create and open an archive for input
-    std::ifstream ifs("filename");
-    boost::archive::text_iarchive ia(ifs);
-    // read class state from archive
-    ia >> newg;
-    // archive and stream closed when destructors are called
-  }
-*/
-
 
   bpo::options_description desc("Allowed options");
   desc.add_options()

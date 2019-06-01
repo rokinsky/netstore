@@ -4,6 +4,8 @@
 #include <boost/serialization/string.hpp>
 #include <boost/serialization/access.hpp>
 #include <filesystem>
+#include <cstring>
+#include <boost/program_options.hpp>
 
 namespace netstore {
 
@@ -23,26 +25,6 @@ class exception : public std::exception {
 constexpr size_t max_udp = 65507;
 
 } // namespace netstore
-
-namespace netstore::aux {
-template<typename T>
-void check_range(const T& value, const T& min, const T& max, const std::string& param) {
-  namespace bpo = boost::program_options;
-  if (value < min || value > max) {
-    throw bpo::validation_error(
-        bpo::validation_error::invalid_option_value, param, std::to_string(value)
-    );
-  }
-}
-
-void check_dir(const std::string& s) {
-  namespace bpo = boost::program_options;
-  if (not std::filesystem::is_directory(s))
-    throw bpo::validation_error(
-        bpo::validation_error::invalid_option_value, "f", s
-    );
-}
-}
 
 namespace netstore::cmd {
 

@@ -11,16 +11,15 @@
 #include <arpa/inet.h>
 #include "helper.hh"
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/time.h>
+
+#include "sockets.hh"
+#include "aux.hh"
 
 #define MAX_UDP 65507
 #define BSIZE         1024
 #define REPEAT_COUNT  30
-
-namespace netstore::sockets {
-  class udp {
-
-  };
-}
 
 namespace netstore {
 
@@ -32,19 +31,15 @@ class server {
       MAX_SPACE(ms),
       SHRD_FLDR(std::move(sf)),
       TIMEOUT(t),
-      sock(0),
-      ip_mreq({}) {
+      udp(MCAST_ADDR, CMD_PORT) {
     available_space = std::max<int64_t>(0, MAX_SPACE - index_files());
     std::cout << "available space: " << available_space << std::endl;
   }
 
-  void connect();
-
   void run();
 
   ~server() {
-    leave_multicast();
-    close();
+    udp.unset_multicast();
   }
 
  private:
@@ -54,8 +49,7 @@ class server {
   std::string SHRD_FLDR;
   uint64_t available_space;
   uint8_t TIMEOUT;
-  int sock;
-  struct ip_mreq ip_mreq;
+  sockets::udp udp;
 
   std::unordered_map<std::string, uint64_t> files;
 
@@ -81,60 +75,16 @@ class server {
 
   ssize_t read_cmd(cmd::simple& cmd, struct sockaddr_in& remote, socklen_t& remote_len) {
     remote_len = sizeof(struct sockaddr_in); /* WARNING !!! */
-    ssize_t rcv_len = recvfrom(sock, &cmd, sizeof(cmd::simple), 0,
-                       (struct sockaddr *) &remote, &remote_len);
+    ssize_t rcv_len = udp.recv(cmd, remote);
     if (rcv_len < 0)
       throw exception("read");
     return rcv_len;
   }
-
-  void open_socket() {
-    sock = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sock < 0)
-      throw exception("open_socket");
-  }
-
-  void join_multicast() {
-    ip_mreq.imr_interface.s_addr = htonl(INADDR_ANY);
-    if (inet_aton(MCAST_ADDR.c_str(), &ip_mreq.imr_multiaddr) == 0)
-      throw exception("inet_aton");
-    if (setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (void *) &ip_mreq,
-                   sizeof ip_mreq) < 0)
-      throw exception("setsockopt");
-  }
-
-  void bind_local() {
-    struct sockaddr_in local_address = {};
-    local_address.sin_family = AF_INET;
-    local_address.sin_addr.s_addr = htonl(INADDR_ANY);
-    local_address.sin_port = htons(CMD_PORT);
-    if (bind(sock, (struct sockaddr *) &local_address, sizeof local_address) < 0)
-      throw exception("bind");
-  }
-
-  void close() {
-    ::close(sock);
-  }
-
-  void leave_multicast() {
-    if (setsockopt(sock, IPPROTO_IP, IP_DROP_MEMBERSHIP, (void *) &ip_mreq,
-                   sizeof ip_mreq) < 0)
-      throw exception("setsockopt");
-  }
 };
-
-void server::connect() {
-  open_socket();
-  join_multicast();
-  bind_local();
-}
 
 void server::hello(struct sockaddr_in& ra, uint64_t cmd_seq) {
   cmd::complex complex(cmd::good_day, cmd_seq, available_space, MCAST_ADDR.c_str());
-  if (sendto(sock, (char *) &complex, complex.size(), 0,
-             (struct sockaddr *) &ra, sizeof(ra)) == -1) {
-    throw exception("sendto");
-  }
+  udp.send(complex, ra);
 }
 
 void server::list(struct sockaddr_in& ra, uint64_t cmd_seq, const std::string& s) {
@@ -152,10 +102,7 @@ void server::list(struct sockaddr_in& ra, uint64_t cmd_seq, const std::string& s
     offset = list.rfind('\n', offset + cmd::max_simpl_data) + 1;
 
     cmd::simple simple(cmd::my_list, cmd_seq, list.c_str() + start, offset - start - 1);
-    if (sendto(sock, (char *) &simple, simple.size(), 0,
-               (struct sockaddr *) &ra, sizeof(ra)) == -1) {
-      throw exception("sendto");
-    }
+    udp.send(simple, ra);
   }
 }
 
@@ -165,13 +112,8 @@ void server::get(struct sockaddr_in& ra, uint64_t cmd_seq, const std::string& s)
   if (sock_tcp < 0)
     throw exception("socket");
 
-
-
   cmd::complex complex(cmd::connect_me, cmd_seq, 11111, s.data());
-  if (sendto(sock, (char *) &complex, complex.size(), 0,
-             (struct sockaddr *) &ra, sizeof(ra)) == -1) {
-    throw exception("sendto");
-  }
+  udp.send(complex, ra);
 
   // listen on socket
 }
@@ -233,7 +175,6 @@ int main(int ac, char** av) {
     notify(vm);
 
     netstore::server s(MCAST_ADDR, CMD_PORT, MAX_SPACE, SHRD_FLDR, TIMEOUT);
-    s.connect();
     std::cout << MCAST_ADDR << " " << CMD_PORT << std::endl;
     s.run();
   } catch (...) {

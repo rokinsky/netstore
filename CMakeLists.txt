@@ -10,12 +10,17 @@ link_directories(${Boost_LIBRARY_DIRS})
 #set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -Wextra -O2 -std=c++17 -l stdc++fs")
 
+add_library(nssockets src/sockets.cc)
+add_library(nsaux src/aux.cc)
+target_link_libraries(nsaux stdc++fs)
+
 # http://stackoverflow.com/questions/10555706/
 macro (add_executable _name)
     # invoke built-in add_executable
     _add_executable(${ARGV})
     if (TARGET ${_name})
-        target_link_libraries(${_name} ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES} stdc++fs)
+        target_link_libraries(${_name} ${CMAKE_THREAD_LIBS_INIT}
+                ${Boost_LIBRARIES} stdc++fs nssockets nsaux)
     endif()
 endmacro()
 
