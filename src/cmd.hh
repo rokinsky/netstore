@@ -20,7 +20,7 @@ namespace netstore::cmd {
 
   /* Rozpoznawanie listy serwerów w grupie */
   constexpr char hello[] = "HELLO"; /* client, simpl */
-  constexpr char good_day[] ="GOOD_DAY"; /* server, cmplx[free space, MCAST_ADDR] */
+  constexpr char good_day[] ="GOOD_DAY"; /* server, cmplx[free space, mcast_addr] */
 
   /* Przeglądanie listy plików i wyszukiwanie na serwerach w grupie */
   constexpr char list[] = "LIST"; /* client, simpl[if data is not empty => search file] */

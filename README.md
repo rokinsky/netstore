@@ -47,11 +47,11 @@ W przypadku potrzeby przesłania wartości zmiennej o zadeklarowanej liczbie bit
 Jeśli wartość przesyłana w polu `cmd` jest krótsza niż `10` znaków, to zawartość pola `cmd` powinna zostać uzupełniona zerami.
 
 ### W dalszej części specyfikacji używane są następujące oznaczenia:
-* `MCAST_ADDR` – adres `IP` rozgłaszania (ang. **multicast**) ukierunkowanego używany przez wszystkie węzły jednej grupy;
+* `mcast_addr` – adres `IP` rozgłaszania (ang. **multicast**) ukierunkowanego używany przez wszystkie węzły jednej grupy;
 
-* `CMD_PORT` – numer portu `UDP`, na którym węzły serwerowe danej grupy nasłuchują pakietów.
+* `cmd_port` – numer portu `UDP`, na którym węzły serwerowe danej grupy nasłuchują pakietów.
 
-Każdy z węzłów serwerowych powinien nasłuchiwać pakietów `UDP` na porcie `CMD_PORT` pod adresem rozgłoszeniowym `MCAST_ADDR` oraz swoim adresem jednostkowym (ang. **unicast**).
+Każdy z węzłów serwerowych powinien nasłuchiwać pakietów `UDP` na porcie `cmd_port` pod adresem rozgłoszeniowym `mcast_addr` oraz swoim adresem jednostkowym (ang. **unicast**).
 
 Wszystkie rozmiary plików i przestrzeni dyskowej wyrażane są w liczbie bajtów.
 
@@ -65,18 +65,18 @@ Serwer w odpowiedzi powinien zawsze przepisać wartość pola `cmd_seq` z otrzym
 Dalej w treści zadania pole `cmd_seq` nie będzie wspominane dla lepszej czytelności i przejrzystości, ale *jest ono obligatoryjne we wszystkich wysyłanych pakietach*.
 
 ### Rozpoznawanie listy serwerów w grupie
-W celu poznania listy aktywnych węzłów serwerowych w grupie klient wysyła na adres rozgłoszeniowy `MCAST_ADDR` i port `CMD_PORT` pakiet `SIMPL_CMD` z poleceniem `cmd = “HELLO”` oraz pustą zawartością pola `data`.
+W celu poznania listy aktywnych węzłów serwerowych w grupie klient wysyła na adres rozgłoszeniowy `mcast_addr` i port `cmd_port` pakiet `SIMPL_CMD` z poleceniem `cmd = “HELLO”` oraz pustą zawartością pola `data`.
 
 Każdy z węzłów serwerowych po otrzymaniu powyższego pakietu powinien odpowiedzieć do nadawcy bezpośrednio na jego adres jednostkowy i port nadawcy pakietem `CMPLX_CMD` zawierającym:
 
 * pole `cmd` z wartością `“GOOD_DAY”`;
 * pole `param` z wartością wolnej przestrzeni dyskowej na przechowywanie plików;
-* pole `data` z wartością tekstową zawierającą adres `MCAST_ADDR`, na jakim serwer nasłuchuje, w notacji kropkowej.
+* pole `data` z wartością tekstową zawierającą adres `mcast_addr`, na jakim serwer nasłuchuje, w notacji kropkowej.
 
 ### Przeglądanie listy plików i wyszukiwanie na serwerach w grupie
-W celu poznania listy wszystkich plików aktualnie przechowywanych w węzłach danej grupy klient wysyła na adres rozgłoszeniowy `MCAST_ADDR` i port `CMD_PORT` pakiet `SIMPL_CMD` z poleceniem `cmd = “LIST”` i pustą wartością pola `data`.
+W celu poznania listy wszystkich plików aktualnie przechowywanych w węzłach danej grupy klient wysyła na adres rozgłoszeniowy `mcast_addr` i port `cmd_port` pakiet `SIMPL_CMD` z poleceniem `cmd = “LIST”` i pustą wartością pola `data`.
 
-W celu odnalezienia w grupie plików zawierających w nazwie zadany ciąg znaków klient wysyła na adres rozgłoszeniowy `MCAST_ADDR` i port `CMD_PORT` pakiet `SIMPL_CMD` z poleceniem `cmd = “LIST”` oraz szukanym ciągiem znaków w polu `data`.
+W celu odnalezienia w grupie plików zawierających w nazwie zadany ciąg znaków klient wysyła na adres rozgłoszeniowy `mcast_addr` i port `cmd_port` pakiet `SIMPL_CMD` z poleceniem `cmd = “LIST”` oraz szukanym ciągiem znaków w polu `data`.
 
 Każdy węzeł serwerowy po otrzymaniu jednego z powyższych pakietów powinien odpowiedzieć nadawcy bezpośrednio na jego adres jednostkowy i port nadawcy pakietem `SIMPL_CMD`:
 
@@ -89,7 +89,7 @@ Jeśli otrzymany przez serwer pakiet z `cmd = “LIST”` zawiera niepusty ciąg
 
 
 ### Pobieranie pliku z serwera
-Dowolny węzeł kliencki ma prawo pobrać dowolny plik z dowolnego węzła serwerowego w danej grupie. Klient w celu rozpoczęcia pobierania konkretnego pliku wysyła do wybranego węzła serwerowego na jego adres jednostkowy i port `CMD_PORT` pakiet `SIMPL_CMD` z poleceniem `cmd = “GET”` oraz nazwą pliku w polu `data`.
+Dowolny węzeł kliencki ma prawo pobrać dowolny plik z dowolnego węzła serwerowego w danej grupie. Klient w celu rozpoczęcia pobierania konkretnego pliku wysyła do wybranego węzła serwerowego na jego adres jednostkowy i port `cmd_port` pakiet `SIMPL_CMD` z poleceniem `cmd = “GET”` oraz nazwą pliku w polu `data`.
 
 
 Serwer po otrzymaniu powyższego komunikatu odpowiada nadawcy na jego adres jednostkowy i port nadawczy pakietem `CMPLX_CMD` zawierającymi:
@@ -107,7 +107,7 @@ Klient po otrzymaniu powyższego komunikatu od serwera powinien nawiązać poł�
 
 
 ### Usuwanie pliku z serwera
-Dowolny węzeł kliencki ma prawo skasować dowolny plik z dowolnego węzła serwerowego w danej grupie. Klient w celu skasowania danego pliku z grupy wysyła na adres rozgłoszeniowy `MCAST_ADDR` (dozwolone jest wysłanie także na adres **unicast** wybranego serwera) i port `CMD_PORT` pakiet `SIMPL_CMD` z poleceniem `cmd = “DEL”` oraz z nazwą pliku do skasowania w polu `data`.
+Dowolny węzeł kliencki ma prawo skasować dowolny plik z dowolnego węzła serwerowego w danej grupie. Klient w celu skasowania danego pliku z grupy wysyła na adres rozgłoszeniowy `mcast_addr` (dozwolone jest wysłanie także na adres **unicast** wybranego serwera) i port `cmd_port` pakiet `SIMPL_CMD` z poleceniem `cmd = “DEL”` oraz z nazwą pliku do skasowania w polu `data`.
 
 
 Każdy węzeł serwerowy po otrzymaniu powyższego komunikatu usuwa trwale plik wskazany nazwą, jeśli taki przechowuje.
@@ -117,7 +117,7 @@ Każdy węzeł serwerowy po otrzymaniu powyższego komunikatu usuwa trwale plik 
 Klient w celu wysłania pliku do przechowywania go w grupie musi najpierw wyznaczyć węzeł, który będzie przechowywał ten plik. W tym celu może wykorzystać polecenie służące rozpoznawaniu serwerów w grupie opisane wcześniej (patrz opis dla `cmd = “HELLO”`).
 
 
-Po wybraniu serwera klient komunikuje się z nim, wysyłając na jego adres jednostkowy oraz port `CMD_PORT` pakiet `CMPLX_CMD` zawierający:
+Po wybraniu serwera klient komunikuje się z nim, wysyłając na jego adres jednostkowy oraz port `cmd_port` pakiet `CMPLX_CMD` zawierający:
 
 * pole `cmd = “ADD”`;
 
@@ -142,25 +142,25 @@ Klient po otrzymaniu powyższego komunikatu powinien nawiązać połączenie `TC
 ## Część A - Węzeł serwerowy
 Zadanie polega na napisaniu programu implementującego zachowanie węzła serwerowego. Program powinien przyjmować następujące parametry linii poleceń:
 
-* `MCAST_ADDR` – adres rozgłaszania ukierunkowanego, ustawiany obowiązkowym parametrem `-g` węzła serwerowego;
+* `mcast_addr` – adres rozgłaszania ukierunkowanego, ustawiany obowiązkowym parametrem `-g` węzła serwerowego;
 
-* `CMD_PORT` – port `UDP` używany do przesyłania i odbierania poleceń, ustawiany obowiązkowym parametrem `-p` węzła serwerowego;
+* `cmd_port` – port `UDP` używany do przesyłania i odbierania poleceń, ustawiany obowiązkowym parametrem `-p` węzła serwerowego;
 
-* `MAX_SPACE` – maksymalna liczba bajtów udostępnianej przestrzeni dyskowej na pliki grupy przez ten węzeł serwerowy, ustawiana opcjonalnym parametrem `-b` węzła serwerowego, wartość domyślna `52428800`;
+* `max_space` – maksymalna liczba bajtów udostępnianej przestrzeni dyskowej na pliki grupy przez ten węzeł serwerowy, ustawiana opcjonalnym parametrem `-b` węzła serwerowego, wartość domyślna `52428800`;
 
-* `SHRD_FLDR` – ścieżka do dedykowanego folderu dyskowego, gdzie mają być przechowywane pliki, ustawiany parametrem obowiązkowym `-f` węzła serwerowego;
+* `shrd_fldr` – ścieżka do dedykowanego folderu dyskowego, gdzie mają być przechowywane pliki, ustawiany parametrem obowiązkowym `-f` węzła serwerowego;
 
-* `TIMEOUT` – liczba sekund, jakie serwer może maksymalnie oczekiwać na połączenia od klientów, ustawiane opcjonalnym parametrem `-t` węzła serwerowego, wartość domyślna `5`, wartość maksymalna `300`.
+* `timeout` – liczba sekund, jakie serwer może maksymalnie oczekiwać na połączenia od klientów, ustawiane opcjonalnym parametrem `-t` węzła serwerowego, wartość domyślna `5`, wartość maksymalna `300`.
 
    
 
-Serwer podczas uruchomienia powinien zindeksować wszystkie pliki znajdujące się bezpośrednio w folderze `SHRD_FLDR`, a ich łączny rozmiar liczony w bajtach odjąć od parametru `MAX_SPACE`. Serwer nie indeksuje plików w podkatalogach folderu `SHRD_FLDR`.
+Serwer podczas uruchomienia powinien zindeksować wszystkie pliki znajdujące się bezpośrednio w folderze `shrd_fldr`, a ich łączny rozmiar liczony w bajtach odjąć od parametru `max_space`. Serwer nie indeksuje plików w podkatalogach folderu `shrd_fldr`.
 
 
-Serwer powinien podłączyć się do grupy rozgłaszania ukierunkowanego pod wskazanym adresem `MCAST_ADDR`. Serwer powinien nasłuchiwać na porcie `CMD_PORT` poleceń otrzymanych z sieci protokołem `UDP` także na swoim adresie **unicast**. Serwer powinien reagować na pakiety `UDP` zgodnie z protokołem opisanym wcześniej.
+Serwer powinien podłączyć się do grupy rozgłaszania ukierunkowanego pod wskazanym adresem `mcast_addr`. Serwer powinien nasłuchiwać na porcie `cmd_port` poleceń otrzymanych z sieci protokołem `UDP` także na swoim adresie **unicast**. Serwer powinien reagować na pakiety `UDP` zgodnie z protokołem opisanym wcześniej.
 
 
-Jeśli serwer otrzyma polecenie dodania pliku lub pobrania pliku, to powinien otworzyć nowe gniazdo `TCP` na losowym wolnym porcie przydzielonym przez system operacyjny i port ten przekazać w odpowiedzi węzłowi klienckiemu. Serwer oczekuje maksymalnie `TIMEOUT` sekund na nawiązanie połączenia przez klienta i jeśli takie nie nastąpi, to port `TCP` powinien zostać niezwłocznie zamknięty. Serwer w czasie oczekiwania na podłączenie się klienta i podczas przesyłania pliku powinien obsługiwać także inne zapytania od klientów.
+Jeśli serwer otrzyma polecenie dodania pliku lub pobrania pliku, to powinien otworzyć nowe gniazdo `TCP` na losowym wolnym porcie przydzielonym przez system operacyjny i port ten przekazać w odpowiedzi węzłowi klienckiemu. Serwer oczekuje maksymalnie `timeout` sekund na nawiązanie połączenia przez klienta i jeśli takie nie nastąpi, to port `TCP` powinien zostać niezwłocznie zamknięty. Serwer w czasie oczekiwania na podłączenie się klienta i podczas przesyłania pliku powinien obsługiwać także inne zapytania od klientów.
 
 
 Jeśli serwer otrzyma polecenia dodania pliku, to odpowiedź klientowi pakietem `“CAN_ADD”` oznacza jednocześnie zarezerwowanie miejsca na serwerze niezbędnego do przyjęcia pliku od klienta.
@@ -185,24 +185,24 @@ Serwer powinien zakończyć swoje działanie łagodnie, to znaczy kończąc otwa
 ## Część B - Węzeł kliencki
 Zadanie polega na napisaniu programu implementującego zachowanie węzła klienckiego. Program powinien przyjmować następujące parametry linii poleceń:
 
-* `MCAST_ADDR` – adres rozgłaszania ukierunkowanego (może być także adresem **broadcast**), ustawiany obowiązkowym parametrem `-g`; klient powinien używać tego adresu do wysyłania komunikatów do grupy węzłów serwerowych;
+* `mcast_addr` – adres rozgłaszania ukierunkowanego (może być także adresem **broadcast**), ustawiany obowiązkowym parametrem `-g`; klient powinien używać tego adresu do wysyłania komunikatów do grupy węzłów serwerowych;
 
-* `CMD_PORT` – port `UDP`, na którym nasłuchują węzły serwerowe, ustawiany obowiązkowym parametrem `-p`; klient powinien używać tego numeru portu, aby wysyłać komunikaty do węzłów serwerowych;
+* `cmd_port` – port `UDP`, na którym nasłuchują węzły serwerowe, ustawiany obowiązkowym parametrem `-p`; klient powinien używać tego numeru portu, aby wysyłać komunikaty do węzłów serwerowych;
 
 * `OUT_FLDR` – ścieżka do folderu dyskowego, gdzie klient będzie zapisywał pobrane pliki, ustawiany parametrem obowiązkowym `-o`;
 
-* `TIMEOUT` – czas oczekiwania na zbieranie informacji od węzłów wyrażony w sekundach; akceptowana wartość powinna być dodatnia i większa od zera; wartość domyślna `5`; wartość maksymalna `300`; może zostać zmieniona przez opcjonalny parametr `-t`.
+* `timeout` – czas oczekiwania na zbieranie informacji od węzłów wyrażony w sekundach; akceptowana wartość powinna być dodatnia i większa od zera; wartość domyślna `5`; wartość maksymalna `300`; może zostać zmieniona przez opcjonalny parametr `-t`.
 
    
 
 Klient po rozpoczęciu swojej pracy powinien oczekiwać na polecenia użytkownika na standardowym wejściu. Każde polecenie kończy się znakiem nowej linii `'\n'`. Rozpoznawane przez program kliencki polecenia użytkownika (wielkość liter nie ma znaczenia):
 
-* `discover` – po otrzymaniu tego polecenia klient powinien wypisać na standardowe wyjście listę wszystkich węzłów serwerowych dostępnych aktualnie w grupie. Klient oczekuje na zgłoszenia serwerów przez `TIMEOUT` sekund, w trakcie oczekiwania interfejs użytkownika zostaje wstrzymany. Dla każdego odnalezionego serwera klient powinien wypisać na standardowe wyjście w jednej linii adres jednostkowy `IP` tego serwera, następnie w nawiasie adres `MCAST_ADDR` otrzymany od danego serwera, a na końcu rozmiar dostępnej przestrzeni dyskowej na tym serwerze. Oczekiwany format takiej linii:
+* `discover` – po otrzymaniu tego polecenia klient powinien wypisać na standardowe wyjście listę wszystkich węzłów serwerowych dostępnych aktualnie w grupie. Klient oczekuje na zgłoszenia serwerów przez `timeout` sekund, w trakcie oczekiwania interfejs użytkownika zostaje wstrzymany. Dla każdego odnalezionego serwera klient powinien wypisać na standardowe wyjście w jednej linii adres jednostkowy `IP` tego serwera, następnie w nawiasie adres `mcast_addr` otrzymany od danego serwera, a na końcu rozmiar dostępnej przestrzeni dyskowej na tym serwerze. Oczekiwany format takiej linii:
 ```
 Found 10.1.1.28 (239.10.11.12) with free space 23456
 ```
 
-* `search %s` – klient powinien uznać polecenie za prawidłowe, także jeśli podany ciąg znaków `%s` jest pusty. Po otrzymaniu tego polecenia klient wysyła po sieci do węzłów serwerowych zapytanie w celu wyszukania plików zawierających ciąg znaków podany przez użytkownika (lub wszystkich plików jeśli ciąg znaków `%s` jest pusty), a następnie przez `TIMEOUT` sekund nasłuchuje odpowiedzi od węzłów serwerowych. Otrzymane listy plików powinny zostać wypisane na standardowe wyjście po jednej linii na jeden plik. Każda linia powinna zawierać informację:
+* `search %s` – klient powinien uznać polecenie za prawidłowe, także jeśli podany ciąg znaków `%s` jest pusty. Po otrzymaniu tego polecenia klient wysyła po sieci do węzłów serwerowych zapytanie w celu wyszukania plików zawierających ciąg znaków podany przez użytkownika (lub wszystkich plików jeśli ciąg znaków `%s` jest pusty), a następnie przez `timeout` sekund nasłuchuje odpowiedzi od węzłów serwerowych. Otrzymane listy plików powinny zostać wypisane na standardowe wyjście po jednej linii na jeden plik. Każda linia powinna zawierać informację:
 ```
 {nazwa_pliku} ({ip_serwera})
 ```
@@ -212,7 +212,7 @@ gdzie:
 
 &nbsp;&nbsp;&nbsp;&nbsp;`{ip_serwera}` to adres jednostkowy `IP` serwera, z którego dana nazwa pliku została przesłana.
 
-Pakiety z odpowiedziami od serwerów z listą plików otrzymane po upływie `TIMEOUT` powinny zostać zignorowane przez klienta. Interfejs użytkownika zostaje wstrzymany na czas oczekiwania odpowiedzi z serwerów.
+Pakiety z odpowiedziami od serwerów z listą plików otrzymane po upływie `timeout` powinny zostać zignorowane przez klienta. Interfejs użytkownika zostaje wstrzymany na czas oczekiwania odpowiedzi z serwerów.
 * `fetch %s` – użytkownik może wskazać nazwę pliku `%s`, tylko jeśli nazwa pliku występowała na liście otrzymanej w wyniku ostatniego wykonania polecenia `search`. W przeciwnym przypadku klient nie podejmuje akcji pobierania pliku, jednocześnie informując użytkownika o błędzie jednoliniowym komunikatem na standardowe wyjście. Jeśli wskazany plik istnieje w ostatnio wyszukiwanych, to klient powinien wybrać dowolny węzeł serwerowy, który przechowuje plik dokładnie wskazany przez podaną nazwę pliku `%s` i rozpocząć pobieranie pliku, zapisując plik do folderu `OUT_FLDR`. W trakcie pobierania pliku użytkownik powinien móc kontynuować korzystanie z programu. Po zakończeniu pobierania pliku klient powinien wypisać na standardowe wyjście komunikat o zakończeniu pobierania pliku w formacie:
 
 ```

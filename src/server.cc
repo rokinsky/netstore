@@ -26,14 +26,15 @@ namespace netstore {
 
 class server {
  public:
-  server(std::string ma, uint16_t cp, int64_t ms, std::string sf, uint8_t t) :
-      MCAST_ADDR(std::move(ma)),
-      CMD_PORT(cp),
-      MAX_SPACE(ms),
-      SHRD_FLDR(std::move(sf)),
-      TIMEOUT(t),
-      udp(MCAST_ADDR, CMD_PORT) {
-    available_space = std::max<int64_t>(0, MAX_SPACE - index_files());
+  server(std::string ma, uint16_t cp, int64_t ms, std::string sf, uint8_t t)
+   : mcast_addr(std::move(ma))
+   , cmd_port(cp)
+   , max_space(ms)
+   , shrd_fldr(std::move(sf))
+   , timeout(t)
+   , udp(mcast_addr, cmd_port)
+  {
+    available_space = std::max<int64_t>(0, max_space - index_files());
     std::cout << "available space: " << available_space << std::endl;
   }
 
@@ -44,12 +45,12 @@ class server {
   }
 
  private:
-  std::string MCAST_ADDR;
-  in_port_t CMD_PORT;
-  int64_t MAX_SPACE;
-  std::string SHRD_FLDR;
+  std::string mcast_addr;
+  in_port_t cmd_port;
+  int64_t max_space;
+  std::string shrd_fldr;
   uint64_t available_space;
-  uint8_t TIMEOUT;
+  uint8_t timeout;
   sockets::udp udp;
 
   std::unordered_map<std::string, uint64_t> files;
@@ -68,7 +69,7 @@ class server {
 uint64_t server::index_files() {
   namespace fs = std::filesystem;
   uint64_t total_size = 0;
-  for (auto& p: fs::directory_iterator(SHRD_FLDR)) {
+  for (auto& p: fs::directory_iterator(shrd_fldr)) {
     if (p.is_regular_file()) {
       files[p.path().filename().string()] = p.file_size();
       total_size += p.file_size();
@@ -87,7 +88,7 @@ ssize_t server::read_cmd(cmd::simple& cmd, struct sockaddr_in& remote) {
 }
 
 void server::hello(struct sockaddr_in& ra, uint64_t cmd_seq) {
-  cmd::complex complex(cmd::good_day, cmd_seq, available_space, MCAST_ADDR.c_str());
+  cmd::complex complex(cmd::good_day, cmd_seq, available_space, mcast_addr.c_str());
   udp.send(complex, ra);
 }
 
@@ -155,21 +156,21 @@ void server::run() {
 
 int main(int ac, char** av) {
   namespace bpo = boost::program_options;
-  std::string MCAST_ADDR;
-  int64_t CMD_PORT;
-  int64_t MAX_SPACE;
-  std::string SHRD_FLDR;
-  int64_t TIMEOUT;
+  std::string mcast_addr;
+  int64_t cmd_port;
+  int64_t max_space;
+  std::string shrd_fldr;
+  int64_t timeout;
 
   bpo::options_description desc("Allowed options");
   desc.add_options()
-  (",g", bpo::value(&MCAST_ADDR)->required(), "Multicast address")
-  (",p", bpo::value(&CMD_PORT)->required()->notifier(
+  (",g", bpo::value(&mcast_addr)->required(), "Multicast address")
+  (",p", bpo::value(&cmd_port)->required()->notifier(
        boost::bind(&netstore::aux::check_range<int64_t>, _1, 0, std::numeric_limits<uint16_t>::max(), "p")), "UDP port")
-  (",b", bpo::value(&MAX_SPACE)->default_value(52428800)->notifier(
+  (",b", bpo::value(&max_space)->default_value(52428800)->notifier(
        boost::bind(&netstore::aux::check_range<int64_t>, _1, 0, std::numeric_limits<int64_t>::max(), "b")), "Allowed space")
-  (",f", bpo::value(&SHRD_FLDR)->required()->notifier(boost::bind(&netstore::aux::check_dir, _1)),"Shared folder")
-  (",t", bpo::value(&TIMEOUT)->default_value(5)->notifier(boost::bind(&netstore::aux::check_range<int64_t>, _1, 0, 300, "t")), "Timeout")
+  (",f", bpo::value(&shrd_fldr)->required()->notifier(boost::bind(&netstore::aux::check_dir, _1)),"Shared folder")
+  (",t", bpo::value(&timeout)->default_value(5)->notifier(boost::bind(&netstore::aux::check_range<int64_t>, _1, 0, 300, "t")), "Timeout")
   ;
 
   try {
@@ -177,8 +178,8 @@ int main(int ac, char** av) {
     store(bpo::parse_command_line(ac, av, desc), vm);
     notify(vm);
 
-    netstore::server s(MCAST_ADDR, CMD_PORT, MAX_SPACE, SHRD_FLDR, TIMEOUT);
-    std::cout << MCAST_ADDR << " " << CMD_PORT << std::endl;
+    netstore::server s(mcast_addr, cmd_port, max_space, shrd_fldr, timeout);
+    std::cout << mcast_addr << " " << cmd_port << std::endl;
     s.run();
   } catch (...) {
     std::cerr << boost::current_exception_diagnostic_information() << std::endl;

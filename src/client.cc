@@ -1,5 +1,5 @@
 /* TODO timeout
- * Maciej Bala Jak mamy watek o sieciach, to ja mam pytanie. Jak wykonujecie czekanie TIMEOUT sekund w poleceniu discover? Select albo poll maja opcje timeoutu, ale blokuja tylko do przyjscia pierwszego pakietu, ktory rownie dobrze moze przyjsc prawie od razu. Ja poki co uzywam do tego sleepa po prostu, ale nie wiem czy o to chodzi. Ta sama kwestia pojawia sie w sumie w poleceniu search
+ * Maciej Bala Jak mamy watek o sieciach, to ja mam pytanie. Jak wykonujecie czekanie timeout sekund w poleceniu discover? Select albo poll maja opcje timeoutu, ale blokuja tylko do przyjscia pierwszego pakietu, ktory rownie dobrze moze przyjsc prawie od razu. Ja poki co uzywam do tego sleepa po prostu, ale nie wiem czy o to chodzi. Ta sama kwestia pojawia sie w sumie w poleceniu search
 Ukryj lub zgłoś
 Lubię to!
  · Odpowiedz · 2 d · Edytowano
@@ -14,7 +14,7 @@ Ukryj lub zgłoś
 Lubię to!
  · Odpowiedz · 2 d
 Maciej Bala
-Maciej Bala Czyli jak dobrze rozumiem, to wywolanie polla na tym fd tak samo zablokuje proces jak sleep? Czy da sie jakos wykryc i przerobic wczesniejsze komunikaty, jeszcze przed uplywem TIMEOUT sekund?
+Maciej Bala Czyli jak dobrze rozumiem, to wywolanie polla na tym fd tak samo zablokuje proces jak sleep? Czy da sie jakos wykryc i przerobic wczesniejsze komunikaty, jeszcze przed uplywem timeout sekund?
 Ukryj lub zgłoś
 Lubię to!
  · Odpowiedz · 2 d
@@ -64,6 +64,8 @@ Lubię to!
 #include <string>
 #include <regex>
 #include <unordered_map>
+#include <boost/bind.hpp>
+#include <boost/exception/diagnostic_information.hpp>
 
 #include "common.hh"
 #include "sockets.hh"
@@ -79,11 +81,13 @@ namespace netstore {
 
 class client {
  public:
-   client(std::string address, in_port_t port)
-   : remote_dotted_address(std::move(address))
-   , remote_port(port)
-   , remote_address({})
-   , udp(0)
+   client(std::string mcast_addr, in_port_t cmd_port, std::string of, uint8_t t)
+    : mcast_addr(std::move(mcast_addr))
+    , cmd_port(cmd_port)
+    , remote_address({})
+    , out_fldr(std::move(of))
+    , timeout(t)
+    , udp(0)
    {}
 
    ~client() {
@@ -102,11 +106,13 @@ class client {
 
   void fetch(const std::string& param);
 
-  std::string remote_dotted_address;
-  in_port_t remote_port;
+  std::string mcast_addr;
+  in_port_t cmd_port;
   struct sockaddr_in remote_address;
-  std::unordered_map<std::string, std::string> files;
+  std::string out_fldr;
+  uint8_t timeout;
   sockets::udp udp;
+  std::unordered_map<std::string, std::string> files;
 };
 
 void client::discover() {
@@ -231,8 +237,8 @@ void client::run() {
 
 void client::set_target() {
   remote_address.sin_family = AF_INET;
-  remote_address.sin_port = htons(remote_port);
-  if (inet_aton(remote_dotted_address.c_str(), &remote_address.sin_addr) == 0)
+  remote_address.sin_port = htons(cmd_port);
+  if (inet_aton(mcast_addr.c_str(), &remote_address.sin_addr) == 0)
     throw std::runtime_error("inet_aton");
 }
 
@@ -240,15 +246,30 @@ void client::set_target() {
 
 int main(int ac, char** av) {
   namespace bpo = boost::program_options;
-
-  netstore::client c(av[1], (in_port_t)atoi(av[2]));
-  c.connect();
-  c.run();
+  std::string mcast_addr;
+  int64_t cmd_port;
+  std::string out_fldr;
+  int64_t timeout;
 
   bpo::options_description desc("Allowed options");
   desc.add_options()
-      ("help", "produce help message")
-      ;
+    (",g", bpo::value(&mcast_addr)->required(), "Multicast address")
+    (",p", bpo::value(&cmd_port)->required()->notifier(
+        boost::bind(&netstore::aux::check_range<int64_t>, _1, 0, std::numeric_limits<uint16_t>::max(), "p")), "UDP port")
+    (",o", bpo::value(&out_fldr)->required()->notifier(boost::bind(&netstore::aux::check_dir, _1)),"Output folder")
+    (",t", bpo::value(&timeout)->default_value(5)->notifier(boost::bind(&netstore::aux::check_range<int64_t>, _1, 0, 300, "t")), "Timeout")
+  ;
 
-  return 0;
+  try {
+    bpo::variables_map vm;
+    store(bpo::parse_command_line(ac, av, desc), vm);
+    notify(vm);
+
+    netstore::client c(mcast_addr, cmd_port, out_fldr, timeout);
+    c.connect();
+    c.run();
+  } catch (...) {
+    std::cerr << boost::current_exception_diagnostic_information() << std::endl;
+    exit(EXIT_FAILURE);
+  }
 }
