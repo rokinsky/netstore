@@ -128,18 +128,16 @@ std::vector<client::mmu_t> client::discover() {
 
   udp.send(simple, mcast_sockaddr);
 
-  ssize_t rcv_len = 0;
-  sockaddr_in ra{};
-
-  while (rcv_len >= 0) {
+  udp.do_until(timeout, [&] () {
     printf("Waiting for response...\n");
     cmd::complex complex;
-    rcv_len = udp.recv(complex, ra);
-    if (rcv_len >= 0 && cmd::validate(complex, simple, cmd::good_day))
+    sockaddr_in ra{};
+    if (udp.recv(complex, ra) > 0 && cmd::validate(complex, simple, cmd::good_day))
       servers.emplace_back(std::make_tuple(complex.param(),
-          std::string(complex.data), std::string(inet_ntoa(ra.sin_addr))));
-  }
-  printf("Didn't get any response. Break request.\n");
+                                           std::string(complex.data),
+                                           std::string(inet_ntoa(ra.sin_addr))));
+  });
+  printf("End timeout.\n");
 
   std::sort(servers.begin(), servers.end());
 
@@ -291,7 +289,6 @@ void client::run() {
 
   while(!aux::is_exit(line)) {
     std::string param;
-    udp.do_until(timeout, [] () {});
     if (aux::is_discover(line)) {
       std::cout << "!!discover" << std::endl;
       print_servers(discover());
