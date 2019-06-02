@@ -235,20 +235,22 @@ void client::run() {
   std::string line;
 
   while (!quit && std::getline(std::cin, line) && !aux::is_exit(line)) {
-    std::string param;
-    if (aux::is_discover(line)) {
-      discover();
-    } else if (aux::is_search(line, param)) {
-      search(param);
-    } else if (aux::is_fetch(line, param)) {
-      std::thread t{[=] { fetch(param); }};
-      t.detach();
-    } else if (aux::is_upload(line, param)) {
-      std::thread t{[=] { upload(param); }};
-      t.detach();
-    } else if (aux::is_remove(line, param)) {
-      remove(param);
-    }
+    try {
+      std::string param;
+      if (aux::is_discover(line)) {
+        discover();
+      } else if (aux::is_search(line, param)) {
+        search(param);
+      } else if (aux::is_fetch(line, param)) {
+        std::thread t{[=] { fetch(param); }};
+        t.detach();
+      } else if (aux::is_upload(line, param)) {
+        std::thread t{[=] { upload(param); }};
+        t.detach();
+      } else if (aux::is_remove(line, param)) {
+        remove(param);
+      }
+    } catch (...) { }
   }
   do_quit();
 }

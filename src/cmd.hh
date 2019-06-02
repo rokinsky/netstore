@@ -10,7 +10,7 @@ constexpr size_t max_simpl_data = max_udp - max_cmd - sizeof(uint64_t);
 constexpr size_t max_cmlpx_data = max_udp - max_cmd - 2 * sizeof(uint64_t);
 
 inline bool eq(const char* a, const char* b) {
-  return strncmp(a, b, max_cmd) == 0; // TODO: memcpy !!!
+  return strncmp(a, b, max_cmd) == 0;
 }
 
 template <typename A, typename B>
@@ -18,25 +18,20 @@ inline bool validate(A& rcv, B& snd, const std::string& expected) {
   return eq(rcv.cmd, expected.c_str()) && rcv.cmd_seq() == snd.cmd_seq();
 }
 
-/* Rozpoznawanie listy serwerów w grupie */
-constexpr char hello[] = "HELLO"; /* client, simpl */
-constexpr char good_day[] ="GOOD_DAY"; /* server, cmplx[free space, mcast_addr] */
+constexpr char hello[] = "HELLO";
+constexpr char good_day[] ="GOOD_DAY";
 
-/* Przeglądanie listy plików i wyszukiwanie na serwerach w grupie */
-constexpr char list[] = "LIST"; /* client, simpl[if data is not empty => search file] */
-constexpr char my_list[] = "MY_LIST"; /* server, simpl[filelist] */
+constexpr char list[] = "LIST";
+constexpr char my_list[] = "MY_LIST";
 
-/* Pobieranie pliku z serwera */
-constexpr char get[] = "GET"; /* client, simpl[filename] */
-constexpr char connect_me[] = "CONNECT_ME"; /* server, cmplx[port TCP, filename] */
+constexpr char get[] = "GET";
+constexpr char connect_me[] = "CONNECT_ME";
 
-/* Usuwanie pliku z serwera */
-constexpr char del[] = "DEL"; /* client, simpl[filename] */
+constexpr char del[] = "DEL";
 
-/* Dodawanie pliku do grupy */
-constexpr char add[] = "ADD"; /* client, cmplx[size, filename] */
-constexpr char no_way[] = "NO_WAY"; /* server, simpl[filename] */
-constexpr char can_add[] = "CAN_ADD"; /* server, cmplx[port TCP, {}] */
+constexpr char add[] = "ADD";
+constexpr char no_way[] = "NO_WAY";
+constexpr char can_add[] = "CAN_ADD";
 
 struct complex;
 struct simple;
