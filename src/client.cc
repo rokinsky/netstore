@@ -46,14 +46,14 @@ class client {
    void run();
 
  private:
-  /* memo, mcast_addr, ucast_addr */
+  /* mem, mcast_addr, ucast_addr */
   typedef std::tuple<uint64_t, std::string, std::string> mmu_t;
 
   sockaddr_in set_target(const std::string& addr, in_port_t port);
 
   std::vector<mmu_t> discover(sockets::udp& sock);
 
-  static void print_servers(const std::vector<mmu_t>& servers);
+  void discover();
 
   void search(const std::string& pattern);
 
@@ -103,8 +103,9 @@ std::vector<client::mmu_t> client::discover(sockets::udp& sock) {
   return servers;
 }
 
-void client::print_servers(const std::vector<mmu_t>& servers) {
-  for (const auto& [mem, mcast, ucast]: servers) msg::found(ucast, mcast, mem);
+void client::discover() {
+  for (const auto& [mem, mcast, ucast]: discover(udp))
+    msg::found(ucast, mcast, mem);
 }
 
 void client::search(const std::string& pattern) {
@@ -169,7 +170,8 @@ void client::fetch(const std::string& param) {
   ssize_t rcv_len = udp.recv(complex, server_address);
 
   if (rcv_len >= 0 && cmd::validate(complex, simple, cmd::connect_me)) {
-    std::cout << "Connect_me " << inet_ntoa(server_address.sin_addr) << ":" << complex.param() << " (" << complex.data << ")" << std::endl;
+    std::cout << "Connect_me " << inet_ntoa(server_address.sin_addr) << ":"
+              << complex.param() << " (" << complex.data << ")" << std::endl;
 
     sockets::tcp tcp;
     tcp.connect(files[param], complex.param());
@@ -190,9 +192,8 @@ void client::upload(const std::string& param) {
 
   auto uploaded = false;
   auto servers = discover(udp_msg);
-  print_servers(servers);
   while (!servers.empty() && !uploaded) {
-    const auto& [mem, mcast, ucast] = servers.back();
+    const auto& [_, mcast, ucast] = servers.back();
     servers.pop_back();
     cmd::complex cmplx_snd { cmd::add, cmd_seq(),
                          std::filesystem::file_size(param),
@@ -211,7 +212,8 @@ void client::upload(const std::string& param) {
     } else if (cmd::validate(simple, cmplx_snd, cmd::can_add)) {
       cmd::complex cmplx_rcv(&simple);
       if (cmplx_rcv.is_empty_data() && ucast == inet_ntoa(sockaddr.sin_addr)) {
-        std::cout << "Connect_me " << inet_ntoa(sockaddr.sin_addr) << ":" << cmplx_rcv.param() << " (" << cmplx_rcv.data << ")" << std::endl;
+        std::cout << "Connect_me " << inet_ntoa(sockaddr.sin_addr) << ":"
+        << cmplx_rcv.param() << " (" << cmplx_rcv.data << ")" << std::endl;
         sockets::tcp tcp;
         tcp.connect(ucast, cmplx_rcv.param());
         tcp.upload(param);
@@ -252,7 +254,7 @@ void client::run() {
     std::string param;
     if (aux::is_discover(line)) {
       std::cout << "!!discover" << std::endl;
-      print_servers(discover(udp));
+      discover();
     } else if (aux::is_search(line, param)) {
       std::cout << "!!searched word: " << param << std::endl;
       search(param);
