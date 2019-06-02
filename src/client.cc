@@ -179,8 +179,8 @@ void client::fetch(const std::string& param) {
       tcp.connect(files[param], complex.param());
       tcp.download(aux::path(out_fldr, complex.data));
       msg::downloaded(param, inet_ntoa(receive_address.sin_addr), complex.param());
-    } catch (...) {
-      msg::downloading_failed(param, inet_ntoa(receive_address.sin_addr), complex.param(), boost::current_exception_diagnostic_information());
+    } catch (const std::exception& e) {
+      msg::downloading_failed(param, inet_ntoa(receive_address.sin_addr), complex.param(), e.what());
     }
   } else {
     msg::downloading_failed(param, "", 0, "");
@@ -223,13 +223,13 @@ void client::upload(const std::string& param) {
           tcp.upload(param);
           uploaded = true;
           msg::uploaded(param, ucast, cmplx_rcv.param());
-        } catch (...) {
-          msg::uploading_failed(param, ucast, cmplx_rcv.param(), boost::current_exception_diagnostic_information());
+        } catch (const std::exception& e) {
+          msg::uploading_failed(param, ucast, cmplx_rcv.param(), e.what());
         }
         continue;
       }
     }
-    msg::skipping(inet_ntoa(sockaddr.sin_addr), sockaddr.sin_port);
+    msg::skipping(inet_ntoa(sockaddr.sin_addr), ntohs(sockaddr.sin_port));
   }
 
   if (!uploaded) msg::too_big(param);

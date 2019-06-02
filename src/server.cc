@@ -128,7 +128,10 @@ void server::get(sockaddr_in& ra, uint64_t cmd_seq, const std::string& f) {
     udp.send(complex, ra);
 
     tcp.accept().upload(path);
-  } catch (...) { }
+  } catch (const std::exception& e) {
+    /* TODO remove it */
+    msg::uploading_failed(f, inet_ntoa(ra.sin_addr), ntohs(ra.sin_port), e.what());
+  }
 }
 
 void server::del(const std::string& f) {
@@ -163,7 +166,9 @@ void server::add(sockaddr_in& ra, uint64_t cmd_seq, uint64_t fsize, const std::s
     udp.send(complex, ra);
 
     tcp.accept().download(path);
-  } catch (...) {
+  } catch (const std::exception& e) {
+    /* TODO remove it */
+    msg::downloading_failed(f, inet_ntoa(ra.sin_addr), ntohs(ra.sin_port), e.what());
     std::unique_lock lk(m);
     inc_space(fsize);
     files.erase(f);
@@ -197,7 +202,9 @@ void server::run() {
       } else {
         msg::skipping(inet_ntoa(remote_address.sin_addr), ntohs(remote_address.sin_port));
       }
-    } catch (...) { }
+    } catch (...) {
+      msg::err("server::run");
+    }
   }
 }
 
