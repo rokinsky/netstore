@@ -20,34 +20,26 @@ namespace netstore::aux {
     return is_match;
   }
 
-  bool is_fetch(const std::string& s, std::string& param) {
+  bool extract_filename(const std::string& word, const std::string& s, std::string& param) {
     std::smatch match;
-    auto is_match = std::regex_match(s, std::regex("^fetch( (.+)){1}"));
+    auto is_match = std::regex_match(s, std::regex("^" + word + "( (.+)){1}"));
 
     if (is_match)
-      param = s.substr(std::min<size_t>(strlen("fetch "), s.length()));
+      param = s.substr(std::min<size_t>(word.length() + 1, s.length()));
 
     return is_match;
+  }
+
+  bool is_fetch(const std::string& s, std::string& param) {
+    return extract_filename("fetch", s, param);
   }
 
   bool is_upload(const std::string& s, std::string& param) {
-    std::smatch match;
-    auto is_match = std::regex_match(s, std::regex("^upload( (.+)){1}"));
-
-    if (is_match)
-      param = s.substr(std::min<size_t>(strlen("upload "), s.length()));
-
-    return is_match;
+    return extract_filename("upload", s, param);
   }
 
   bool is_remove(const std::string& s, std::string& param) {
-    std::smatch match;
-    auto is_match = std::regex_match(s, std::regex("^remove( (.+)){1}"));
-
-    if (is_match)
-      param = s.substr(std::min<size_t>(strlen("remove "), s.length()));
-
-    return is_match;
+    return extract_filename("remove", s, param);
   }
 
   bool is_exit(const std::string& s) {

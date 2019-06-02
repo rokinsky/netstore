@@ -246,7 +246,7 @@ void client::upload(const std::string& param) {
 
 void client::remove(const std::string& param) {
   cmd::simple simple { cmd::del, cmd_seq(), param.data() };
-  if (param.empty()) throw std::logic_error("filename is empty");
+  if (param.empty()) throw std::logic_error("regex was bad, filename is empty");
   udp.send(simple, mcast_sockaddr);
 }
 
@@ -258,30 +258,21 @@ void client::connect(sockets::udp& sock) {
 
 void client::run() {
   std::string line;
-  std::getline(std::cin, line);
 
-  while(!aux::is_exit(line)) {
+  while(std::getline(std::cin, line) && !aux::is_exit(line)) {
     std::string param;
     if (aux::is_discover(line)) {
-      std::cout << "!!discover" << std::endl;
       discover();
     } else if (aux::is_search(line, param)) {
-      std::cout << "!!searched word: " << param << std::endl;
       search(param);
     } else if (aux::is_fetch(line, param)) {
-      std::cout << "!!fetch" << std::endl;
       fetch(param);
     } else if (aux::is_upload(line, param)) {
-      std::cout << "!!upload" << std::endl;
       upload(param);
     } else if (aux::is_remove(line, param)) {
-      std::cout << "!!remove" << std::endl;
       remove(param);
     }
-    std::cout << line << std::endl;
-    std::getline(std::cin, line);
   }
-  printf("Closing.\n");
 }
 
 sockaddr_in client::set_target(const std::string& addr, in_port_t port) {
