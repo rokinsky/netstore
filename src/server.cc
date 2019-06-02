@@ -13,6 +13,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/time.h>
+#include <unordered_map>
 #include <fstream>
 #include <atomic>
 #include <mutex>
@@ -88,7 +89,7 @@ uint64_t server::index_files() {
 }
 
 void server::hello(sockaddr_in& ra, uint64_t cmd_seq) {
-  std::unique_lock lk(m);
+  std::unique_lock<std::mutex> lk(m);
   cmd::complex complex(cmd::good_day, cmd_seq, available_space, mcast_addr.c_str());
   udp.send(complex, ra);
 }
@@ -133,7 +134,7 @@ void server::del(const std::string& f) {
   if (!aux::validate(f) || !aux::exists(path)) return;
   std::filesystem::remove(path);
 
-  std::unique_lock lk(m);
+  std::unique_lock<std::mutex> lk(m);
   inc_space(files[f]);
   files.erase(f);
 }
@@ -141,7 +142,7 @@ void server::del(const std::string& f) {
 void server::add(sockaddr_in& ra, uint64_t cmd_seq, uint64_t fsize, const std::string& f) {
   const auto path = aux::path(shrd_fldr, f);
   {
-    std::unique_lock lk(m);
+    std::unique_lock<std::mutex> lk(m);
     if (!aux::validate(f) || files.find(f) != files.end() || fsize > available_space) {
       cmd::simple simple(cmd::no_way, cmd_seq, f.data());
       udp.send(simple, ra);
@@ -161,7 +162,7 @@ void server::add(sockaddr_in& ra, uint64_t cmd_seq, uint64_t fsize, const std::s
 
     tcp.accept().download(path);
   } catch (...) {
-    std::unique_lock lk(m);
+    std::unique_lock<std::mutex> lk(m);
     inc_space(fsize);
     files.erase(f);
   }

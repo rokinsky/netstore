@@ -1,5 +1,5 @@
-#ifndef NETSTORE_2_CMD_HH
-#define NETSTORE_2_CMD_HH
+#ifndef _CMD_HH
+#define _CMD_HH
 
 #include "common.hh"
 
@@ -46,7 +46,8 @@ namespace netstore::cmd {
     uint64_t _cmd_seq = 0;
     char data[max_simpl_data] = {0};
 
-    simple(const char *cmd_, uint64_t cmd_seq_, const char *data_ = "", size_t data_size = max_simpl_data);
+    simple(const char *cmd_, uint64_t cmd_seq_, const char *data_ = "",
+        size_t data_size = max_simpl_data);
 
     explicit simple(complex* complex);
 
@@ -79,7 +80,8 @@ namespace netstore::cmd {
 
     complex() = default;
 
-    complex(const char* cmd_, uint64_t cmd_seq_, uint64_t param_, const char* data_ = "");
+    complex(const char* cmd_, uint64_t cmd_seq_, uint64_t param_,
+        const char* data_ = "");
 
     explicit complex(simple* simple);
 
@@ -108,4 +110,4 @@ namespace netstore::cmd {
 
 } // namespace netstore::cmd
 
-#endif //NETSTORE_2_CMD_HH
+#endif // _CMD_HH

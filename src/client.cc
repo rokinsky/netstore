@@ -207,11 +207,11 @@ void client::upload(const std::string& param) {
           sockets::tcp tcp;
           tcp.connect(ucast, cmplx_rcv.param());
           tcp.upload(param);
-          uploaded = true;
           msg::uploaded(param, ucast, cmplx_rcv.param());
         } catch (const std::exception& e) {
           msg::uploading_failed(param, ucast, cmplx_rcv.param(), e.what());
         }
+        uploaded = true;
         continue;
       }
     }

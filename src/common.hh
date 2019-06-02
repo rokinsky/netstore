@@ -11,7 +11,7 @@
 
 namespace netstore {
 
-static std::atomic<bool> quit = false;
+static std::atomic<bool> quit{false};
 
 class exception : public std::exception {
   std::string msg;
@@ -26,7 +26,7 @@ class exception : public std::exception {
   }
 };
 
-inline bool do_quit() { quit.store(true); }
+inline void do_quit() { quit.store(true); }
 
 inline void handler(int signal) {
   do_quit();

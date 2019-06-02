@@ -1,6 +1,7 @@
 CC	= g++ 
-CFLAGS	= -Wextra -Wall -O2 -std=c++17
-LFLAGS	= -Wall
+CXXFLAGS	= -Wextra -Wall -O2 -std=c++17 -l stdc++fs -pthread -llboost_program_options
+
+LFLAGS	= -Wall -l stdc++fs -pthread -l boost_program_options
 
 all: TARGET
 
@@ -9,10 +10,10 @@ debug: TARGET
 
 TARGET: netstore-server netstore-client
 
-netstore-server: netstore-server.o
+netstore-server: server.o cmd.o aux.o sockets.o
 	$(CC) $(LFLAGS) $^ -o $@
 
-netstore-client: netstore-client.o
+netstore-client: client.o cmd.o aux.o sockets.o
 	$(CC) $(LFLAGS) $^ -o $@
 
 .PHONY: clean TARGET

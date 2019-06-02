@@ -1,5 +1,5 @@
-#ifndef NETSTORE_2_SOCKETS_HH
-#define NETSTORE_2_SOCKETS_HH
+#ifndef _SOCKETS_HH
+#define _SOCKETS_HH
 
 #include <bits/types.h>
 #include <string>
@@ -122,4 +122,4 @@ class tcp {
 
 }
 
-#endif //NETSTORE_2_SOCKETS_HH
+#endif // _SOCKETS_HH
