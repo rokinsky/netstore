@@ -111,6 +111,8 @@ class client {
 
   void upload(const std::string& param);
 
+  void remove(const std::string& param);
+
   static uint64_t cmd_seq();
 
   std::string mcast_addr;
@@ -278,6 +280,10 @@ void client::upload(const std::string& param) {
   }
 }
 
+void remove(const std::string& param) {
+
+}
+
 //client::~client();
 
 void client::connect() {
@@ -307,6 +313,7 @@ void client::run() {
       upload(param);
     } else if (aux::is_remove(line, param)) {
       std::cout << "!!remove" << std::endl;
+      remove(param);
     }
     std::cout << line << std::endl;
     std::getline(std::cin, line);

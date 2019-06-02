@@ -148,6 +148,7 @@ void server::add(sockaddr_in& ra, uint64_t cmd_seq, uint64_t fsize, const std::s
 
   auto msg_tcp = tcp.accept();
   msg_tcp.download(path);
+  files[f] = std::filesystem::file_size(path);
 }
 
 void server::run() {
