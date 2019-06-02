@@ -8,7 +8,8 @@
 namespace netstore::aux {
   bool is_discover(const std::string& s) { return s == "discover"; }
 
-  bool extract_rgx(const std::string& word, const std::string& s, const std::string& rgx, std::string& param) {
+  bool extract_rgx(const std::string& word, const std::string& s,
+                   const std::string& rgx, std::string& param) {
     std::smatch match;
     auto is_match = std::regex_match(s, std::regex("^" + word + rgx));
 
@@ -22,7 +23,8 @@ namespace netstore::aux {
     return extract_rgx("search", s, "( |( (.*))?)", param);
   }
 
-  bool extract_filename(const std::string& word, const std::string& s, std::string& param) {
+  bool extract_filename(const std::string& word, const std::string& s,
+                        std::string& param) {
     return extract_rgx(word, s, "( (.+)){1}", param);
   }
 

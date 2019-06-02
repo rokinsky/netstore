@@ -61,7 +61,8 @@ class udp {
   template <typename Func>
   void do_until(uint8_t timeout, Func&& func) {
     using namespace std::chrono;
-    const auto end = system_clock::now() + duration_cast<milliseconds>(seconds(timeout));
+    const auto end = system_clock::now()
+                   + duration_cast<milliseconds>(seconds(timeout));
     auto ttl = [&end] () {
       return duration_cast<milliseconds>(end - system_clock::now());
     };
@@ -102,9 +103,11 @@ class tcp {
 
   char* buffer();
 
-  void download(const std::string& path, const std::atomic<bool>& quit = netstore::quit);
+  void download(const std::string& path,
+                const std::atomic<bool>& quit = netstore::quit);
 
-  void upload(const std::string& path, const std::atomic<bool>& quit = netstore::quit);
+  void upload(const std::string& path,
+              const std::atomic<bool>& quit = netstore::quit);
 
   void set_timeout(const timeval& tv = default_to);
 

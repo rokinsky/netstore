@@ -63,7 +63,8 @@ void udp::close() { ::close(sock); }
 
 void udp::set_broadcast() {
   int optval = 1;
-  if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, (void *) &optval, sizeof optval) < 0)
+  if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, (void *) &
+      optval, sizeof optval) < 0)
     throw std::runtime_error("udp::setsockopt broadcast");
 }
 
@@ -144,7 +145,8 @@ ssize_t tcp::read() {
 char* tcp::buffer() { return _buffer; }
 
 void tcp::download(const std::string& path, const std::atomic<bool>& quit) {
-  std::ofstream file(path, std::ofstream::binary | std::ofstream::out | std::ofstream::trunc);
+  std::ofstream file(path, std::ofstream::binary |
+                     std::ofstream::out | std::ofstream::trunc);
 
   if (file.is_open()) {
     ssize_t nread;

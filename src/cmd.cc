@@ -8,7 +8,8 @@
 
 namespace netstore::cmd {
 
-simple::simple(const char *cmd_, uint64_t cmd_seq_, const char *data_, size_t data_size) {
+simple::simple(const char *cmd_, uint64_t cmd_seq_,
+              const char *data_, size_t data_size) {
   strcpy(cmd, cmd_/*, max_cmd*/);
   _cmd_seq = htobe64(cmd_seq_);
   strncpy(data, data_, data_size);
@@ -34,7 +35,8 @@ complex::complex(simple* simple) {
   memmove(this, simple, max_udp);
 }
 
-complex::complex(const char* cmd_, uint64_t cmd_seq_, uint64_t param_, const char* data_) {
+complex::complex(const char* cmd_, uint64_t cmd_seq_,
+                uint64_t param_, const char* data_) {
   strcpy(cmd, cmd_/*, max_cmd*/);
   _cmd_seq = htobe64(cmd_seq_);
   _param = htobe64(param_);

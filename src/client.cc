@@ -163,9 +163,11 @@ void client::fetch(const std::string& param) {
       sockets::tcp tcp;
       tcp.connect(files[param], complex.param());
       tcp.download(aux::path(out_fldr, complex.data));
-      msg::downloaded(param, inet_ntoa(receive_address.sin_addr), complex.param());
+      msg::downloaded(param, inet_ntoa(receive_address.sin_addr),
+          complex.param());
     } catch (const std::exception& e) {
-      msg::downloading_failed(param, inet_ntoa(receive_address.sin_addr), complex.param(), e.what());
+      msg::downloading_failed(param, inet_ntoa(receive_address.sin_addr),
+          complex.param(), e.what());
     }
   } else {
     msg::downloading_failed(param, "", 0, "");
@@ -278,9 +280,12 @@ int main(int ac, char** av) {
   desc.add_options()
     (",g", bpo::value(&mcast_addr)->required(), "Multicast address")
     (",p", bpo::value(&cmd_port)->required()->notifier(
-        boost::bind(&netstore::aux::check_range<int64_t>, _1, 0, std::numeric_limits<uint16_t>::max(), "p")), "UDP port")
-    (",o", bpo::value(&out_fldr)->required()->notifier(boost::bind(&netstore::aux::check_dir, _1, "o")),"Output folder")
-    (",t", bpo::value(&timeout)->default_value(5)->notifier(boost::bind(&netstore::aux::check_range<int64_t>, _1, 0, 300, "t")), "Timeout")
+        boost::bind(&netstore::aux::check_range<int64_t>, _1, 0,
+            std::numeric_limits<uint16_t>::max(), "p")), "UDP port")
+    (",o", bpo::value(&out_fldr)->required()
+    ->notifier(boost::bind(&netstore::aux::check_dir, _1, "o")),"Output folder")
+    (",t", bpo::value(&timeout)->default_value(5)
+    ->notifier(boost::bind(&netstore::aux::check_range<int64_t>, _1, 0, 300, "t")), "Timeout")
   ;
 
   try {
