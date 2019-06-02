@@ -90,9 +90,9 @@ class client {
     , out_fldr(std::move(of))
     , timeout(t)
     , udp(0)
-   {}
+   { connect(udp); }
 
-   void connect();
+   void connect(sockets::udp& sock);
    void run();
 
  private:
@@ -101,7 +101,7 @@ class client {
 
   sockaddr_in set_target(const std::string& addr, in_port_t port);
 
-  std::vector<mmu_t> discover();
+  std::vector<mmu_t> discover(sockets::udp& sock);
 
   static void print_servers(const std::vector<mmu_t>& servers);
 
@@ -130,18 +130,18 @@ uint64_t client::cmd_seq() {
   return ++cmd_seq;
 }
 
-std::vector<client::mmu_t> client::discover() {
+std::vector<client::mmu_t> client::discover(sockets::udp& sock) {
   std::vector<mmu_t> servers;
   printf("Sending request...\n");
   cmd::simple simple { cmd::hello, cmd_seq() };
 
-  udp.send(simple, mcast_sockaddr);
+  sock.send(simple, mcast_sockaddr);
 
-  udp.do_until(timeout, [&] {
+  sock.do_until(timeout, [&] {
     printf("Waiting for response...\n");
     cmd::complex complex;
     sockaddr_in ra{};
-    if (udp.recv(complex, ra) > 0 && cmd::validate(complex, simple, cmd::good_day))
+    if (sock.recv(complex, ra) > 0 && cmd::validate(complex, simple, cmd::good_day))
       servers.emplace_back(std::make_tuple(complex.param(),
                                            std::string(complex.data),
                                            std::string(inet_ntoa(ra.sin_addr))));
@@ -235,27 +235,27 @@ void client::upload(const std::string& param) {
     return;
   }
 
-  auto servers = discover();
-  print_servers(servers);
-  auto uploaded = false;
-
   sockets::udp udp_msg(0);
-  udp_msg.set_ttl(TTL_VALUE);
-  udp_msg.set_timeout(timeval{timeout, 0});
+  connect(udp_msg);
 
+  auto uploaded = false;
+  auto servers = discover(udp_msg);
+  print_servers(servers);
   while (!servers.empty() && !uploaded) {
     const auto& [mem, mcast, ucast] = servers.back();
     servers.pop_back();
-    auto sockaddr = set_target(ucast, cmd_port);
     cmd::complex cmplx_snd { cmd::add, cmd_seq(),
                          std::filesystem::file_size(param),
                          std::filesystem::path(param).filename().c_str()
                          };
     printf("UPLOAD: Sending request\n");
+    auto sockaddr = set_target(ucast, cmd_port);
     udp_msg.send(cmplx_snd, sockaddr);
     printf("UPLOAD: Waiting for response...\n");
+
     cmd::simple simple {};
     udp_msg.recv(simple, sockaddr);
+
     if (cmd::validate(simple, cmplx_snd, cmd::no_way) && simple.is_empty_data()) {
       continue;
     } else if (cmd::validate(simple, cmplx_snd, cmd::can_add)) {
@@ -288,14 +288,13 @@ void client::remove(const std::string& param) {
 
 //client::~client();
 
-void client::connect() {
-  udp.set_broadcast();
-  udp.set_ttl(TTL_VALUE);
-  udp.set_timeout(timeval{timeout, 0});
+void client::connect(sockets::udp& sock) {
+  sock.set_broadcast();
+  sock.set_ttl(TTL_VALUE);
+  sock.set_timeout(timeval{timeout, 0});
 }
 
 void client::run() {
-
   std::string line;
   std::getline(std::cin, line);
 
@@ -303,7 +302,7 @@ void client::run() {
     std::string param;
     if (aux::is_discover(line)) {
       std::cout << "!!discover" << std::endl;
-      print_servers(discover());
+      print_servers(discover(udp));
     } else if (aux::is_search(line, param)) {
       std::cout << "!!searched word: " << param << std::endl;
       search(param);
@@ -357,7 +356,6 @@ int main(int ac, char** av) {
     notify(vm);
 
     netstore::client c(mcast_addr, cmd_port, out_fldr, timeout);
-    c.connect();
     c.run();
   } catch (...) {
     std::cerr << boost::current_exception_diagnostic_information() << std::endl;
