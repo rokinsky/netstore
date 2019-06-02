@@ -12,6 +12,8 @@
 
 namespace netstore::sockets {
 
+static constexpr timeval default_to = {5, 0};
+
 class udp {
  private:
   ::ip_mreq ip_mreq;
@@ -41,7 +43,7 @@ class udp {
 
   void set_broadcast();
 
-  void set_timeout(const timeval& tv);
+  void set_timeout(const timeval& tv = default_to);
 
   template<typename C>
   void send(C& msg, sockaddr_in& ra) {
@@ -81,7 +83,6 @@ class udp {
 class tcp {
  public:
   static constexpr size_t bsize = 4096 * 512; /* 2 MiB */
-  static constexpr uint8_t default_to = 5;
 
   tcp();
   explicit tcp(uint32_t sock);
@@ -103,6 +104,7 @@ class tcp {
   in_port_t port();
 
   void write(ssize_t n = bsize);
+
   ssize_t read();
 
   char* buffer();
@@ -111,7 +113,7 @@ class tcp {
 
   void upload(const std::string& path, const std::atomic<bool>& quit = netstore::quit);
 
-  void set_timeout(const timeval& tv = {default_to, 0});
+  void set_timeout(const timeval& tv = default_to);
 
  private:
   int sock;

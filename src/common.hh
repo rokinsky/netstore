@@ -1,5 +1,5 @@
-#ifndef _HELPER_HH
-#define _HELPER_HH
+#ifndef _COMMON_HH
+#define _COMMON_HH
 
 #include <boost/serialization/string.hpp>
 #include <boost/serialization/access.hpp>
@@ -11,11 +11,7 @@
 
 namespace netstore {
 
-static std::atomic<bool> quit{false};
-void handler(int _) {
-  std::cout << "SIGINT handled" << std::endl;
-  quit.store(true);
-}
+static std::atomic<bool> quit = false;
 
 class exception : public std::exception {
   std::string msg;
@@ -29,6 +25,13 @@ class exception : public std::exception {
     return msg.c_str();
   }
 };
+
+inline bool do_quit() { quit.store(true); }
+
+inline void handler(int signal) {
+  do_quit();
+  throw exception(strsignal(signal));
+}
 
 constexpr size_t max_udp = 65507;
 
@@ -74,6 +77,10 @@ namespace netstore::msg {
   inline void err(const std::string& s) {
     std::cerr << s << " (" << std::strerror(errno) << ")" << std::endl;
   }
+
+  inline void not_featchable(const std::string& file) {
+    std::cout << "File " << file << " is not on searched list" << std::endl;
+  }
 }
 
-#endif // _HELPER_HH
+#endif // _COMMON_HH

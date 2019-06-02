@@ -38,9 +38,7 @@ class server {
 
   void run();
 
-  ~server() {
-    udp.unset_multicast();
-  }
+  ~server() { udp.unset_multicast(); }
 
  private:
   std::string mcast_addr;
@@ -56,7 +54,7 @@ class server {
   sockets::udp udp;
 
   void hello(sockaddr_in& ra, uint64_t cmd_seq);
-  void list(sockaddr_in& ra, uint64_t cmd_seq, const std::string& f);
+  void list(sockaddr_in& ra, uint64_t cmd_seq, const std::string& s);
   void get(sockaddr_in& ra, uint64_t cmd_seq, const std::string& f);
   void del(const std::string& f);
   void add(sockaddr_in& ra, uint64_t cmd_seq, uint64_t fsize, const std::string& f);
@@ -97,7 +95,7 @@ void server::hello(sockaddr_in& ra, uint64_t cmd_seq) {
 
 void server::list(sockaddr_in& ra, uint64_t cmd_seq, const std::string& s) {
   std::string list;
-  for (const auto &[k, v]: files) {
+  for (const auto &[k, _]: files) {
     if (s.empty() || k.find(s) != std::string::npos) {
       list += k + '\n';
     }
@@ -122,16 +120,12 @@ void server::get(sockaddr_in& ra, uint64_t cmd_seq, const std::string& f) {
     tcp.bind();
     tcp.listen();
     tcp.set_timeout({timeout, 0});
-    std::cout << "opened port: " << tcp.port() << std::endl;
 
     cmd::complex complex(cmd::connect_me, cmd_seq, tcp.port(), f.data());
     udp.send(complex, ra);
 
     tcp.accept().upload(path);
-  } catch (const std::exception& e) {
-    /* TODO remove it */
-    msg::uploading_failed(f, inet_ntoa(ra.sin_addr), ntohs(ra.sin_port), e.what());
-  }
+  } catch (...) { }
 }
 
 void server::del(const std::string& f) {
@@ -162,14 +156,11 @@ void server::add(sockaddr_in& ra, uint64_t cmd_seq, uint64_t fsize, const std::s
     tcp.bind();
     tcp.listen();
     tcp.set_timeout({timeout, 0});
-    std::cout << "opened port: " << tcp.port() << std::endl;
     cmd::complex complex(cmd::can_add, cmd_seq, tcp.port());
     udp.send(complex, ra);
 
     tcp.accept().download(path);
-  } catch (const std::exception& e) {
-    /* TODO remove it */
-    msg::downloading_failed(f, inet_ntoa(ra.sin_addr), ntohs(ra.sin_port), e.what());
+  } catch (...) {
     std::unique_lock lk(m);
     inc_space(fsize);
     files.erase(f);
@@ -182,19 +173,20 @@ void server::run() {
       cmd::simple simple;
       sockaddr_in remote_address{};
       auto rcv = udp.recv(simple, remote_address);
+      if (rcv <= 0) continue;
 
-      if (rcv > 0 && cmd::eq(simple.cmd, cmd::hello) && simple.is_empty_data()) {
+      if (cmd::eq(simple.cmd, cmd::hello) && simple.is_empty_data()) {
         hello(remote_address, simple.cmd_seq());
-      } else if (rcv > 0 && cmd::eq(simple.cmd, cmd::list)) {
+      } else if (cmd::eq(simple.cmd, cmd::list)) {
         list(remote_address, simple.cmd_seq(), simple.data);
-      } else if (rcv > 0 && cmd::eq(simple.cmd, cmd::get)) {
+      } else if (cmd::eq(simple.cmd, cmd::get)) {
         std::thread t{[=] () mutable {
           get(remote_address, simple.cmd_seq(), simple.data);
         }};
         t.detach();
-      } else if (rcv > 0 && cmd::eq(simple.cmd, cmd::del)) {
+      } else if (cmd::eq(simple.cmd, cmd::del)) {
         del(simple.data);
-      } else if (rcv > 0 && cmd::eq(simple.cmd, cmd::add)) {
+      } else if (cmd::eq(simple.cmd, cmd::add)) {
         cmd::complex complex(&simple);
         std::thread t{[=] () mutable {
           add(remote_address, complex.cmd_seq(), complex.param(), complex.data);
@@ -203,9 +195,7 @@ void server::run() {
       } else {
         msg::skipping(inet_ntoa(remote_address.sin_addr), ntohs(remote_address.sin_port));
       }
-    } catch (...) {
-      msg::err("server::run");
-    }
+    } catch (...) { }
   }
 }
 
@@ -239,7 +229,6 @@ int main(int ac, char** av) {
     s.run();
   } catch (...) {
     std::cerr << boost::current_exception_diagnostic_information() << std::endl;
-    exit(EXIT_FAILURE);
   }
-  exit(EXIT_SUCCESS);
+  return EXIT_FAILURE;
 }

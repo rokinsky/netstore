@@ -82,13 +82,11 @@ uint64_t client::cmd_seq() {
 
 std::vector<client::mmu_t> client::discover(sockets::udp& sock) {
   std::vector<mmu_t> servers;
-  printf("Sending request...\n");
   cmd::simple simple { cmd::hello, cmd_seq() };
 
   sock.send(simple, mcast_sockaddr);
 
   sock.do_until(timeout, [&] {
-    printf("Waiting for response...\n");
     cmd::complex complex;
     sockaddr_in ra{};
     if (sock.recv(complex, ra) > 0
@@ -98,7 +96,6 @@ std::vector<client::mmu_t> client::discover(sockets::udp& sock) {
                                            std::string(complex.data),
                                            std::string(inet_ntoa(ra.sin_addr))));
   });
-  printf("End timeout.\n");
 
   std::sort(servers.begin(), servers.end());
 
@@ -111,19 +108,15 @@ void client::discover() {
 }
 
 void client::search(const std::string& pattern) {
-  printf("Sending request...\n");
   files.clear();
   cmd::simple simple { cmd::list, cmd_seq(), pattern.data() };
 
   udp.send(simple, mcast_sockaddr);
 
   udp.do_until (timeout, [&] {
-    printf("Waiting for response...\n");
     cmd::simple rcved;
     sockaddr_in ra{};
     if (udp.recv(rcved, ra) > 0) {
-      printf("address: %s:%d\n", inet_ntoa(ra.sin_addr),
-             ntohs(ra.sin_port));
       if (cmd::validate(rcved, simple, cmd::my_list)) {
         std::string list(rcved.data);
         size_t offset = 0;
@@ -140,11 +133,10 @@ void client::search(const std::string& pattern) {
           msg::searched(filename, inet_ntoa(ra.sin_addr));
         }
       } else {
-        // TODO error
+        msg::skipping(inet_ntoa(ra.sin_addr), ntohs(ra.sin_port));
       }
     }
   });
-  printf("Timeout end\n");
 }
 
 void client::fetch(const std::string& param) {
@@ -155,26 +147,20 @@ void client::fetch(const std::string& param) {
   }
 
   if (addr.empty()) {
-    std::cout << "nie ma pliku" << std::endl;
+    msg::not_featchable(param);
     return;
   }
 
-  printf("Sending request...\n");
-
   auto server_address = set_target(addr, cmd_port);
-
   cmd::simple simple { cmd::get, cmd_seq(), param.data() };
   udp.send(simple, server_address);
 
-  printf("Waiting for response...\n");
   cmd::complex complex;
-
+  udp.set_timeout();
   sockaddr_in receive_address{};
   ssize_t rcv_len = udp.recv(complex, receive_address);
 
   if (rcv_len >= 0 && cmd::validate(complex, simple, cmd::connect_me)) {
-    std::cout << "Connect_me " << inet_ntoa(receive_address.sin_addr) << ":"
-              << complex.param() << " (" << complex.data << ")" << std::endl;
     try {
       sockets::tcp tcp;
       tcp.connect(files[param], complex.param());
@@ -185,7 +171,6 @@ void client::fetch(const std::string& param) {
     }
   } else {
     msg::downloading_failed(param, "", 0, "");
-    std::cout << "blad " << std::strerror(errno) << std::endl;
   }
 }
 
@@ -251,7 +236,7 @@ void client::connect(sockets::udp& sock) {
 void client::run() {
   std::string line;
 
-  while(!quit && std::getline(std::cin, line) && !aux::is_exit(line)) {
+  while (!quit && std::getline(std::cin, line) && !aux::is_exit(line)) {
     std::string param;
     if (aux::is_discover(line)) {
       discover();
@@ -265,11 +250,9 @@ void client::run() {
       t.detach();
     } else if (aux::is_remove(line, param)) {
       remove(param);
-    } else {
-      std::cout << "Warning: wrong command" << std::endl;
     }
   }
-  if (!aux::is_exit(line)) quit.store(true);
+  do_quit();
 }
 
 sockaddr_in client::set_target(const std::string& addr, in_port_t port) {
@@ -311,7 +294,6 @@ int main(int ac, char** av) {
     c.run();
   } catch (...) {
     std::cerr << boost::current_exception_diagnostic_information() << std::endl;
-    exit(EXIT_FAILURE);
+    return EXIT_FAILURE;
   }
-  exit(EXIT_SUCCESS);
 }
