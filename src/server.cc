@@ -64,7 +64,7 @@ class server {
 
   uint64_t index_files();
 
-  ssize_t read_cmd(cmd::simple& cmd, sockaddr_in& remote);
+  void read_cmd(cmd::simple& cmd, sockaddr_in& remote);
 
   void set_space(uint64_t value) {
     if (available_space > 0) throw std::logic_error("available space is not zero");
@@ -87,18 +87,9 @@ uint64_t server::index_files() {
     if (p.is_regular_file()) {
       files[p.path().filename().string()] = p.file_size();
       total_size += p.file_size();
-      std::cout << p.path().filename().string() << "(" << p.file_size() << ")" << '\n';
     }
   }
-  std::cout << "total size: " << total_size << std::endl;
   return total_size;
-}
-
-ssize_t server::read_cmd(cmd::simple& cmd, sockaddr_in& remote) {
-  ssize_t rcv_len = udp.recv(cmd, remote);
-  if (rcv_len < 0)
-    throw exception("read");
-  return rcv_len;
 }
 
 void server::hello(sockaddr_in& ra, uint64_t cmd_seq) {
@@ -109,7 +100,6 @@ void server::hello(sockaddr_in& ra, uint64_t cmd_seq) {
 
 void server::list(sockaddr_in& ra, uint64_t cmd_seq, const std::string& s) {
   std::string list;
-  std::cout << "searching for " << s << std::endl;
   for (const auto &[k, v]: files) {
     if (s.empty() || k.find(s) != std::string::npos) {
       list += k + '\n';
@@ -130,19 +120,17 @@ void server::get(sockaddr_in& ra, uint64_t cmd_seq, const std::string& f) {
   const auto path = aux::path(shrd_fldr, f);
   if (!aux::validate(f) || !aux::exists(path)) return;
 
-  sockets::tcp tcp;
-  tcp.bind();
-  tcp.listen();
-  tcp.set_timeout({timeout, 0});
-  cmd::complex complex(cmd::connect_me, cmd_seq, tcp.port(), f.data());
-  udp.send(complex, ra);
-
   try {
-    auto msg_tcp = tcp.accept();
-    msg_tcp.upload(path);
-  } catch (...) { }
+    sockets::tcp tcp;
+    tcp.bind();
+    tcp.listen();
+    tcp.set_timeout({timeout, 0});
 
-  //msg::uploaded(f, inet_ntoa(ra.sin_addr), ra.sin_port);
+    cmd::complex complex(cmd::connect_me, cmd_seq, tcp.port(), f.data());
+    udp.send(complex, ra);
+
+    tcp.accept().upload(path);
+  } catch (...) { }
 }
 
 void server::del(const std::string& f) {
@@ -150,17 +138,14 @@ void server::del(const std::string& f) {
   if (!aux::validate(f) || !aux::exists(path)) return;
   std::filesystem::remove(path);
 
-  {
-    std::unique_lock lk(m);
-    inc_space(files[f]);
-    files.erase(f);
-  }
+  std::unique_lock lk(m);
+  inc_space(files[f]);
+  files.erase(f);
 }
 
 void server::add(sockaddr_in& ra, uint64_t cmd_seq, uint64_t fsize, const std::string& f) {
   const auto path = aux::path(shrd_fldr, f);
   {
-    std::cout << "adding data: " << f << std::endl;
     std::unique_lock lk(m);
     if (!aux::validate(f) || files.find(f) != files.end() || fsize > available_space) {
       cmd::simple simple(cmd::no_way, cmd_seq, f.data());
@@ -170,19 +155,17 @@ void server::add(sockaddr_in& ra, uint64_t cmd_seq, uint64_t fsize, const std::s
     dec_space(fsize);
     files[f] = fsize;
   }
-  sockets::tcp tcp;
-  tcp.bind();
-  tcp.listen();
-  tcp.set_timeout({timeout, 0});
-  cmd::complex complex(cmd::can_add, cmd_seq, tcp.port());
-  udp.send(complex, ra);
 
   try {
-    auto msg_tcp = tcp.accept();
-    msg_tcp.download(path);
-    /* TODO if error download then acquire mutex and available space += file size and erase files[f] */
+    sockets::tcp tcp;
+    tcp.bind();
+    tcp.listen();
+    tcp.set_timeout({timeout, 0});
+    cmd::complex complex(cmd::can_add, cmd_seq, tcp.port());
+    udp.send(complex, ra);
+
+    tcp.accept().download(path);
   } catch (...) {
-    std::cout << "accepting or downloading failed " << std::endl;
     std::unique_lock lk(m);
     inc_space(fsize);
     files.erase(f);
@@ -190,32 +173,33 @@ void server::add(sockaddr_in& ra, uint64_t cmd_seq, uint64_t fsize, const std::s
 }
 
 void server::run() {
-  /* TODO endless loop */
-  for (auto i = 0; i < REPEAT_COUNT; ++i) {
-    cmd::simple simple;
-    sockaddr_in remote_address{};
-    ssize_t rcv_len = read_cmd(simple, remote_address);
+  while (true) {
+    try {
+      cmd::simple simple;
+      sockaddr_in remote_address{};
+      auto rcv = udp.recv(simple, remote_address);
 
-    printf("address: %s %d\n", inet_ntoa(remote_address.sin_addr),
-           ntohs(remote_address.sin_port));
-    printf("read %zd bytes: %s, seq: %lu\n", rcv_len, simple.cmd,
-           simple.cmd_seq());
-    printf("read data %s\n", simple.data);
-
-    if (cmd::eq(simple.cmd, cmd::hello) && simple.is_empty_data()) {
-      hello(remote_address, simple.cmd_seq());
-    } else if (cmd::eq(simple.cmd, cmd::list)) {
-      list(remote_address, simple.cmd_seq(), simple.data);
-    } else if (cmd::eq(simple.cmd, cmd::get)) {
-      get(remote_address, simple.cmd_seq(), simple.data);
-    } else if (cmd::eq(simple.cmd, cmd::del)) {
-      del(simple.data);
-    } else if (cmd::eq(simple.cmd, cmd::add)) {
-      cmd::complex complex(&simple);
-      add(remote_address, complex.cmd_seq(), complex.param(), complex.data);
-    } else {
-      msg::skipping(inet_ntoa(remote_address.sin_addr), ntohs(remote_address.sin_port));
-    }
+      if (rcv > 0 && cmd::eq(simple.cmd, cmd::hello) && simple.is_empty_data()) {
+        hello(remote_address, simple.cmd_seq());
+      } else if (rcv > 0 && cmd::eq(simple.cmd, cmd::list)) {
+        list(remote_address, simple.cmd_seq(), simple.data);
+      } else if (rcv > 0 && cmd::eq(simple.cmd, cmd::get)) {
+        std::thread t{[=] () mutable {
+          get(remote_address, simple.cmd_seq(), simple.data);
+        }};
+        t.detach();
+      } else if (rcv > 0 && cmd::eq(simple.cmd, cmd::del)) {
+        del(simple.data);
+      } else if (rcv > 0 && cmd::eq(simple.cmd, cmd::add)) {
+        cmd::complex complex(&simple);
+        std::thread t{[=] () mutable {
+          add(remote_address, complex.cmd_seq(), complex.param(), complex.data);
+        }};
+        t.detach();
+      } else {
+        msg::skipping(inet_ntoa(remote_address.sin_addr), ntohs(remote_address.sin_port));
+      }
+    } catch (...) { }
   }
 }
 

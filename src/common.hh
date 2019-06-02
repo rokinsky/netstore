@@ -64,6 +64,10 @@ namespace netstore::msg {
   inline void searched(const std::string& file, const std::string& addr) {
     std::cout << file << " (" << addr << ")" << std::endl;
   }
+
+  inline void err(const std::string& s) {
+    std::cerr << s << " (" << std::strerror(errno) << ")" << std::endl;
+  }
 }
 
 #endif // _HELPER_HH

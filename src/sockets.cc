@@ -40,7 +40,7 @@ namespace netstore::sockets {
   void udp::set_ttl(int32_t value) {
     if (setsockopt(sock, IPPROTO_IP, IP_MULTICAST_TTL, (void *) &value,
                    sizeof value) < 0)
-      throw exception("udp::setsockopt multicast ttl");
+      msg::err("udp::setsockopt multicast ttl");
   }
 
   void udp::set_multicast(const std::string& addr) {
@@ -109,9 +109,7 @@ namespace netstore::sockets {
     if (inet_aton(addr.c_str(), &sa.sin_addr) == 0)
       throw exception("tcp::inet_aton");
 
-    socklen_t addr_len = sizeof(sockaddr_in);
-
-    if (::connect(sock, (sockaddr *) &sa, addr_len) < 0)
+    if (::connect(sock, (sockaddr *) &sa, sizeof(sockaddr_in)) < 0)
       throw exception("tcp::connect");
   }
 

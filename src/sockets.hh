@@ -47,7 +47,8 @@ class udp {
   void send(C& msg, sockaddr_in& ra) {
     if (sendto(sock, &msg, msg.size(), 0, (sockaddr *) &ra,
                sizeof(ra)) != msg.size())
-      throw exception("udp::send");
+      //throw exception("udp::send");
+      std::cerr << "udp::send" << std::endl;
   }
 
   template<typename C>

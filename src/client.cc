@@ -206,22 +206,17 @@ void client::upload(const std::string& param) {
                          std::filesystem::file_size(param),
                          std::filesystem::path(param).filename().c_str()
                          };
-    printf("UPLOAD: Sending request\n");
     auto sockaddr = set_target(ucast, cmd_port);
     udp_msg.send(cmplx_snd, sockaddr);
-    printf("UPLOAD: Waiting for response...\n");
 
     cmd::simple simple {};
     udp_msg.recv(simple, sockaddr);
 
     if (cmd::validate(simple, cmplx_snd, cmd::no_way) && simple.data == param) {
-      std::cout << "NO_WAY" << std::endl;
       continue;
     } else if (cmd::validate(simple, cmplx_snd, cmd::can_add)) {
       cmd::complex cmplx_rcv(&simple);
       if (cmplx_rcv.is_empty_data() && ucast == inet_ntoa(sockaddr.sin_addr)) {
-        std::cout << "Connect_me " << inet_ntoa(sockaddr.sin_addr) << ":"
-        << cmplx_rcv.param() << " (" << cmplx_rcv.data << ")" << std::endl;
         try {
           sockets::tcp tcp;
           tcp.connect(ucast, cmplx_rcv.param());
@@ -237,11 +232,7 @@ void client::upload(const std::string& param) {
     msg::skipping(inet_ntoa(sockaddr.sin_addr), sockaddr.sin_port);
   }
 
-  if (!uploaded) {
-    msg::too_big(param);
-  } else {
-
-  }
+  if (!uploaded) msg::too_big(param);
 }
 
 void client::remove(const std::string& param) {
@@ -266,9 +257,15 @@ void client::run() {
     } else if (aux::is_search(line, param)) {
       search(param);
     } else if (aux::is_fetch(line, param)) {
-      fetch(param);
+      std::thread t{[=] () mutable {
+        fetch(param);
+      }};
+      t.detach();
     } else if (aux::is_upload(line, param)) {
-      upload(param);
+      std::thread t{[=] () mutable {
+        upload(param);
+      }};
+      t.detach();
     } else if (aux::is_remove(line, param)) {
       remove(param);
     }
