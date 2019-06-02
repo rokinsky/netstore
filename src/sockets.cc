@@ -66,8 +66,7 @@ namespace netstore::sockets {
       throw std::runtime_error("udp::setsockopt broadcast");
   }
 
-  void udp::set_timeout(__time_t sec, __suseconds_t usec) {
-    timeval tv {sec, usec};
+  void udp::set_timeout(const timeval& tv) {
     setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(timeval));
   }
 

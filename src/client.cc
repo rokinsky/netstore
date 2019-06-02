@@ -237,9 +237,9 @@ void client::upload(const std::string& param) {
 
   sockets::udp udp_msg(0);
   udp_msg.set_ttl(TTL_VALUE);
-  udp_msg.set_timeout(timeout, 0);
+  udp_msg.set_timeout(timeval{timeout, 0});
 
-  while (!servers.empty() || !uploaded) {
+  while (!servers.empty() && !uploaded) {
     const auto& [mem, mcast, ucast] = servers.back();
     servers.pop_back();
     auto sockaddr = set_target(ucast, cmd_port);
@@ -281,7 +281,7 @@ void client::upload(const std::string& param) {
 void client::connect() {
   udp.set_broadcast();
   udp.set_ttl(TTL_VALUE);
-  udp.set_timeout(timeout, 0);
+  udp.set_timeout(timeval{timeout, 0});
 }
 
 void client::run() {
@@ -291,6 +291,7 @@ void client::run() {
 
   while(!aux::is_exit(line)) {
     std::string param;
+    udp.do_until(timeout, [] () {});
     if (aux::is_discover(line)) {
       std::cout << "!!discover" << std::endl;
       print_servers(discover());

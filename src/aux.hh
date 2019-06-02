@@ -39,6 +39,15 @@ namespace netstore::aux {
   inline bool exists(const std::string& path) {
     return std::filesystem::exists(path);
   }
+
+  template<typename Duration>
+  struct timeval to_timeval(Duration&& d) {
+    const auto sec = std::chrono::duration_cast<std::chrono::seconds>(d);
+    struct timeval tv{};
+    tv.tv_sec  = sec.count();
+    tv.tv_usec = std::chrono::duration_cast<std::chrono::microseconds>(d - sec).count();
+    return tv;
+  }
 }
 
 #endif //NETSTORE_2_AUX_HH

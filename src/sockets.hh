@@ -6,7 +6,9 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include "common.hh"
+#include "aux.hh"
 #include <sys/socket.h>
+#include <thread>
 
 namespace netstore::sockets {
 
@@ -39,7 +41,7 @@ class udp {
 
   void set_broadcast();
 
-  void set_timeout(__time_t sec, __suseconds_t usec);
+  void set_timeout(const timeval& tv);
 
   template<typename C>
   void send(C& msg, sockaddr_in& ra) {
@@ -58,6 +60,20 @@ class udp {
       //TODO throw exception("udp::recv");
       std::cout << "udp::recv" << std::endl;
     return rcv_len;
+  }
+
+  template <typename Func>
+  void do_until(uint8_t timeout, Func&& func) {
+    using namespace std::chrono;
+    const auto end = system_clock::now() + duration_cast<milliseconds>(seconds(timeout));
+    auto ttl = [&end] () {
+      return duration_cast<milliseconds>(end - system_clock::now());
+    };
+
+    for (auto left = ttl(); left.count() > 0; left = ttl()) {
+      set_timeout(aux::to_timeval(left));
+      func();
+    }
   }
 };
 
