@@ -133,6 +133,7 @@ void server::get(sockaddr_in& ra, uint64_t cmd_seq, const std::string& f) {
   sockets::tcp tcp;
   tcp.bind();
   tcp.listen();
+  tcp.set_timeout({timeout, 0});
   cmd::complex complex(cmd::connect_me, cmd_seq, tcp.port(), f.data());
   udp.send(complex, ra);
 
@@ -156,6 +157,7 @@ void server::del(const std::string& f) {
 void server::add(sockaddr_in& ra, uint64_t cmd_seq, uint64_t fsize, const std::string& f) {
   const auto path = aux::path(shrd_fldr, f);
   {
+    std::cout << "adding data: " << f << std::endl;
     std::unique_lock lk(m);
     if (!aux::validate(f) || files.find(f) != files.end() || fsize > available_space) {
       cmd::simple simple(cmd::no_way, cmd_seq, f.data());
@@ -168,7 +170,7 @@ void server::add(sockaddr_in& ra, uint64_t cmd_seq, uint64_t fsize, const std::s
   sockets::tcp tcp;
   tcp.bind();
   tcp.listen();
-  /* TODO set timeout on TCP socket */
+  tcp.set_timeout({timeout, 0});
   cmd::complex complex(cmd::can_add, cmd_seq, tcp.port());
   udp.send(complex, ra);
 
@@ -177,8 +179,9 @@ void server::add(sockaddr_in& ra, uint64_t cmd_seq, uint64_t fsize, const std::s
     msg_tcp.download(path);
     /* TODO if error download then acquire mutex and available space += file size and erase files[f] */
   } catch (...) {
+    std::cout << "accepting or downloading failed " << std::endl;
     std::unique_lock lk(m);
-    dec_space(fsize);
+    inc_space(fsize);
     files.erase(f);
   }
 }
@@ -208,12 +211,11 @@ void server::run() {
       cmd::complex complex(&simple);
       add(remote_address, complex.cmd_seq(), complex.param(), complex.data);
     } else {
-      std::cerr << "[PCKG ERROR] Skipping invalid package from "
-      << inet_ntoa(remote_address.sin_addr) << ":"
-      << ntohs(remote_address.sin_port) << "." << std::endl;
+      msg::skipping(inet_ntoa(remote_address.sin_addr), ntohs(remote_address.sin_port));
     }
   }
 }
+
 } // namespace netstore
 
 int main(int ac, char** av) {
@@ -241,7 +243,6 @@ int main(int ac, char** av) {
     notify(vm);
 
     netstore::server s(mcast_addr, cmd_port, max_space, shrd_fldr, timeout);
-    std::cout << mcast_addr << " " << cmd_port << std::endl;
     s.run();
   } catch (...) {
     std::cerr << boost::current_exception_diagnostic_information() << std::endl;

@@ -90,7 +90,9 @@ std::vector<client::mmu_t> client::discover(sockets::udp& sock) {
     printf("Waiting for response...\n");
     cmd::complex complex;
     sockaddr_in ra{};
-    if (sock.recv(complex, ra) > 0 && cmd::validate(complex, simple, cmd::good_day))
+    if (sock.recv(complex, ra) > 0
+    && cmd::validate(complex, simple, cmd::good_day)
+    && !complex.is_empty_data())
       servers.emplace_back(std::make_tuple(complex.param(),
                                            std::string(complex.data),
                                            std::string(inet_ntoa(ra.sin_addr))));
@@ -173,6 +175,7 @@ void client::fetch(const std::string& param) {
               << complex.param() << " (" << complex.data << ")" << std::endl;
 
     sockets::tcp tcp;
+    tcp.set_timeout({timeout, 0});
     tcp.connect(files[param], complex.param());
     tcp.download(aux::path(out_fldr, complex.data));
   } else {
@@ -207,17 +210,23 @@ void client::upload(const std::string& param) {
     udp_msg.recv(simple, sockaddr);
 
     if (cmd::validate(simple, cmplx_snd, cmd::no_way) && simple.data == param) {
+      std::cout << "NO_WAY" << std::endl;
       continue;
     } else if (cmd::validate(simple, cmplx_snd, cmd::can_add)) {
       cmd::complex cmplx_rcv(&simple);
-      if (cmplx_rcv.data == param && ucast == inet_ntoa(sockaddr.sin_addr)) {
+      if (cmplx_rcv.is_empty_data() && ucast == inet_ntoa(sockaddr.sin_addr)) {
         std::cout << "Connect_me " << inet_ntoa(sockaddr.sin_addr) << ":"
         << cmplx_rcv.param() << " (" << cmplx_rcv.data << ")" << std::endl;
-        sockets::tcp tcp;
-        tcp.connect(ucast, cmplx_rcv.param());
-        tcp.upload(param);
-        uploaded = true;
-        msg::uploaded(param, inet_ntoa(sockaddr.sin_addr), sockaddr.sin_port);
+        try {
+          sockets::tcp tcp;
+          tcp.set_timeout({timeout, 0});
+          tcp.connect(ucast, cmplx_rcv.param());
+          tcp.upload(param);
+          uploaded = true;
+          msg::uploaded(param, ucast, cmplx_rcv.param());
+        } catch (...) {
+          msg::uploading_failed(param, ucast, cmplx_rcv.param(), "asd");
+        }
         continue;
       }
     }

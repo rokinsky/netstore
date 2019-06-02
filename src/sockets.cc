@@ -181,4 +181,8 @@ namespace netstore::sockets {
       std::cout << "error!!! file send" << std::endl;
     }
   }
+
+  void tcp::set_timeout(const timeval& tv) {
+    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(timeval));
+  }
 }

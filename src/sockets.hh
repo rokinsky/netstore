@@ -109,6 +109,8 @@ class tcp {
 
   void upload(const std::string& path);
 
+  void set_timeout(const timeval& tv);
+
  private:
   int sock;
   char _buffer[bsize];
