@@ -168,23 +168,29 @@ void client::fetch(const std::string& param) {
   printf("Waiting for response...\n");
   cmd::complex complex;
 
-  ssize_t rcv_len = udp.recv(complex, server_address);
+  sockaddr_in receive_address{};
+  ssize_t rcv_len = udp.recv(complex, receive_address);
 
   if (rcv_len >= 0 && cmd::validate(complex, simple, cmd::connect_me)) {
-    std::cout << "Connect_me " << inet_ntoa(server_address.sin_addr) << ":"
+    std::cout << "Connect_me " << inet_ntoa(receive_address.sin_addr) << ":"
               << complex.param() << " (" << complex.data << ")" << std::endl;
-
-    sockets::tcp tcp;
-    tcp.set_timeout({timeout, 0});
-    tcp.connect(files[param], complex.param());
-    tcp.download(aux::path(out_fldr, complex.data));
+    try {
+      sockets::tcp tcp;
+      tcp.set_timeout({timeout, 0});
+      tcp.connect(files[param], complex.param());
+      tcp.download(aux::path(out_fldr, complex.data));
+      msg::downloaded(param, inet_ntoa(receive_address.sin_addr), complex.param());
+    } catch (...) {
+      msg::downloading_failed(param, inet_ntoa(receive_address.sin_addr), complex.param(), "");
+    }
   } else {
+    msg::downloading_failed(param, "", 0, "");
     std::cout << "blad " << std::strerror(errno) << std::endl;
   }
 }
 
 void client::upload(const std::string& param) {
-  if (!aux::exists(param)) {
+  if (!aux::exists(param) || !std::filesystem::is_regular_file(param)) {
     msg::not_exists(param);
     return;
   }
@@ -225,7 +231,7 @@ void client::upload(const std::string& param) {
           uploaded = true;
           msg::uploaded(param, ucast, cmplx_rcv.param());
         } catch (...) {
-          msg::uploading_failed(param, ucast, cmplx_rcv.param(), "asd");
+          msg::uploading_failed(param, ucast, cmplx_rcv.param(), "");
         }
         continue;
       }
@@ -245,8 +251,6 @@ void client::remove(const std::string& param) {
   if (param.empty()) throw std::logic_error("filename is empty");
   udp.send(simple, mcast_sockaddr);
 }
-
-//client::~client();
 
 void client::connect(sockets::udp& sock) {
   sock.set_broadcast();

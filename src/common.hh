@@ -46,11 +46,11 @@ namespace netstore::msg {
   }
 
   inline void downloading_failed(const std::string& file, const std::string& addr, in_port_t port, const std::string& desc) {
-    std::cout << "File " << file << " downloading failed ("<< addr << ":" << port << ") " << desc << std::endl;
+    std::cout << "File " << file << " downloading failed ("<< addr << ":" << (port == 0 ? "" : std::to_string(port)) << ") " << desc << std::endl;
   }
 
   inline void uploading_failed(const std::string& file, const std::string& addr, in_port_t port, const std::string& desc) {
-    std::cout << "File " << file << " uploading failed ("<< addr << ":" << port << ") " << desc << std::endl;
+    std::cout << "File " << file << " uploading failed ("<< addr << ":" << (port == 0 ? "" : std::to_string(port)) << ") " << desc << std::endl;
   }
 
   inline void not_exists(const std::string& file) {
