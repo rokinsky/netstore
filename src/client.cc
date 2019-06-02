@@ -280,8 +280,10 @@ void client::upload(const std::string& param) {
   }
 }
 
-void remove(const std::string& param) {
-
+void client::remove(const std::string& param) {
+  cmd::simple simple { cmd::del, cmd_seq(), param.data() };
+  if (param.empty()) throw std::logic_error("filename is empty");
+  udp.send(simple, mcast_sockaddr);
 }
 
 //client::~client();

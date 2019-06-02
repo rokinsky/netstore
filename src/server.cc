@@ -59,7 +59,7 @@ class server {
   void hello(sockaddr_in& ra, uint64_t cmd_seq);
   void list(sockaddr_in& ra, uint64_t cmd_seq, const std::string& f);
   void get(sockaddr_in& ra, uint64_t cmd_seq, const std::string& f);
-  void del(sockaddr_in& ra, uint64_t cmd_seq, const std::string& f);
+  void del(const std::string& f);
   void add(sockaddr_in& ra, uint64_t cmd_seq, uint64_t fsize, const std::string& f);
 
   uint64_t index_files();
@@ -127,8 +127,12 @@ void server::get(sockaddr_in& ra, uint64_t cmd_seq, const std::string& f) {
   msg::uploaded(f, inet_ntoa(ra.sin_addr), ra.sin_port);
 }
 
-void server::del(sockaddr_in& ra, uint64_t cmd_seq, const std::string& f) {
-  if (!aux::validate(f) || !aux::exists(aux::path(shrd_fldr, f))) return;
+void server::del(const std::string& f) {
+  const auto path = aux::path(shrd_fldr, f);
+  if (!aux::validate(f) || !aux::exists(path)) return;
+  std::filesystem::remove(path);
+  available_space.fetch_add(files[f]);
+  files.erase(f);
 }
 
 void server::add(sockaddr_in& ra, uint64_t cmd_seq, uint64_t fsize, const std::string& f) {
@@ -171,7 +175,7 @@ void server::run() {
     } else if (cmd::eq(simple.cmd, cmd::get)) {
       get(remote_address, simple.cmd_seq(), simple.data);
     } else if (cmd::eq(simple.cmd, cmd::del)) {
-      del(remote_address, simple.cmd_seq(), simple.data);
+      del(simple.data);
     } else if (cmd::eq(simple.cmd, cmd::add)) {
       cmd::complex complex(&simple);
       add(remote_address, complex.cmd_seq(), complex.param(), complex.data);
