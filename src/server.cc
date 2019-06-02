@@ -5,7 +5,7 @@
 #include <boost/program_options/parsers.hpp>
 #include <boost/bind.hpp>
 #include <iostream>
-#include <filesystem>
+#include <boost/filesystem.hpp>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -77,12 +77,12 @@ class server {
 };
 
 uint64_t server::index_files() {
-  namespace fs = std::filesystem;
+  namespace fs = boost::filesystem;
   uint64_t total_size = 0;
   for (auto& p: fs::directory_iterator(shrd_fldr)) {
-    if (p.is_regular_file()) {
-      files[p.path().filename().string()] = p.file_size();
-      total_size += p.file_size();
+    if (fs::is_regular_file(p)) {
+      files[p.path().filename().string()] = fs::file_size(p);
+      total_size += fs::file_size(p);
     }
   }
   return total_size;
@@ -132,7 +132,7 @@ void server::get(sockaddr_in& ra, uint64_t cmd_seq, const std::string& f) {
 void server::del(const std::string& f) {
   const auto path = aux::path(shrd_fldr, f);
   if (!aux::validate(f) || !aux::exists(path)) return;
-  std::filesystem::remove(path);
+  boost::filesystem::remove(path);
 
   std::unique_lock<std::mutex> lk(m);
   inc_space(files[f]);

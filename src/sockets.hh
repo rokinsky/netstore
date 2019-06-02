@@ -47,22 +47,14 @@ class udp {
 
   template<typename C>
   void send(C& msg, sockaddr_in& ra) {
-    if (sendto(sock, &msg, msg.size(), 0, (sockaddr *) &ra,
-               sizeof(ra)) != msg.size())
-      //throw exception("udp::send");
-      std::cerr << "udp::send" << std::endl;
+    sendto(sock, &msg, msg.size(), 0, (sockaddr *) &ra, sizeof(ra));
   }
 
   template<typename C>
   ssize_t recv(C& msg, sockaddr_in& ra) {
-    ssize_t rcv_len = 0;
     socklen_t remote_len = sizeof(sockaddr_in);
-    rcv_len = recvfrom(sock, &msg, sizeof(msg), 0, (sockaddr *) &ra,
+    return recvfrom(sock, &msg, sizeof(msg), 0, (sockaddr *) &ra,
                        &remote_len);
-    if (rcv_len < 0)
-      //TODO throw exception("udp::recv");
-      std::cout << "udp::recv" << std::endl;
-    return rcv_len;
   }
 
   template <typename Func>

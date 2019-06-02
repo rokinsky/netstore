@@ -8,7 +8,7 @@
 
 #include "sockets.hh"
 #include "common.hh"
-#include <filesystem>
+#include <boost/filesystem.hpp>
 #include <fstream>
 
 namespace netstore::sockets {
@@ -157,7 +157,7 @@ namespace netstore::sockets {
 
   void tcp::upload(const std::string& path, const std::atomic<bool>& quit) {
     std::ifstream file(path, std::ifstream::binary | std::ifstream::in);
-    auto fsize = std::filesystem::file_size(path);
+    auto fsize = boost::filesystem::file_size(path);
 
     if (file.is_open()) {
       while (!quit && fsize > 0) {

@@ -7,8 +7,6 @@
 #include <sys/socket.h>
 #include <boost/archive/text_iarchive.hpp>
 #include <boost/archive/text_oarchive.hpp>
-#include <boost/serialization/string.hpp>
-#include <boost/serialization/access.hpp>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -17,6 +15,8 @@
 #include <vector>
 #include <tuple>
 #include <mutex>
+
+#include <boost/filesystem.hpp>
 
 #include <boost/bind.hpp>
 #include <boost/exception/diagnostic_information.hpp>
@@ -175,7 +175,7 @@ void client::fetch(const std::string& param) {
 }
 
 void client::upload(const std::string& param) {
-  if (!aux::exists(param) || !std::filesystem::is_regular_file(param)) {
+  if (!aux::exists(param) || !boost::filesystem::is_regular_file(param)) {
     msg::not_exists(param);
     return;
   }
@@ -189,8 +189,8 @@ void client::upload(const std::string& param) {
     const auto& [_, mcast, ucast] = servers.back();
     servers.pop_back();
     cmd::complex cmplx_snd { cmd::add, cmd_seq(),
-                         std::filesystem::file_size(param),
-                         std::filesystem::path(param).filename().c_str()
+                         boost::filesystem::file_size(param),
+                         boost::filesystem::path(param).filename().c_str()
                          };
     auto sockaddr = set_target(ucast, cmd_port);
     udp_msg.send(cmplx_snd, sockaddr);

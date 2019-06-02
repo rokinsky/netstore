@@ -1,7 +1,7 @@
 CC	= g++ 
-CXXFLAGS	= -Wextra -Wall -O2 -std=c++17 -l stdc++fs -pthread -llboost_program_options
+CXXFLAGS	= -Wextra -Wall -O2 -std=c++17 -lboost_system -lboost_filesystem  -pthread -llboost_program_options
 
-LFLAGS	= -Wall -l stdc++fs -pthread -l boost_program_options
+LFLAGS	= -Wall -lboost_system -lboost_filesystem -pthread -l boost_program_options
 
 all: TARGET
 

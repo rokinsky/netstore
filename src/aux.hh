@@ -2,6 +2,8 @@
 #define NETSTORE_2_AUX_HH
 
 #include <string>
+#include <boost/filesystem.hpp>
+#include <chrono>
 
 namespace netstore::aux {
 bool is_discover(const std::string& s);
@@ -36,7 +38,7 @@ inline bool validate(const std::string& filename) {
 }
 
 inline bool exists(const std::string& path) {
-  return std::filesystem::exists(path);
+  return boost::filesystem::exists(path);
 }
 
 template <typename Duration>

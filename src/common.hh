@@ -3,7 +3,6 @@
 
 #include <boost/serialization/string.hpp>
 #include <boost/serialization/access.hpp>
-#include <filesystem>
 #include <string>
 #include <boost/program_options.hpp>
 #include <iostream>

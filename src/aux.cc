@@ -1,7 +1,7 @@
 #include <string>
 #include <regex>
 #include <boost/program_options.hpp>
-#include <filesystem>
+#include <boost/filesystem.hpp>
 
 #include "aux.hh"
 
@@ -42,7 +42,7 @@ namespace netstore::aux {
 
   void check_dir(const std::string& s) {
     namespace bpo = boost::program_options;
-    if (!std::filesystem::is_directory(s))
+    if (!boost::filesystem::is_directory(s))
       throw bpo::validation_error(
           bpo::validation_error::invalid_option_value, "f", s
       );

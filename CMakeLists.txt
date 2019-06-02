@@ -2,7 +2,7 @@ cmake_minimum_required (VERSION 3.7.2)
 project (netstore-2 CXX)
 
 find_package ( Threads REQUIRED )
-find_package ( Boost COMPONENTS program_options REQUIRED)
+find_package ( Boost COMPONENTS program_options filesystem REQUIRED)
 
 include_directories(${Boost_INCLUDE_DIR})
 link_directories(${Boost_LIBRARY_DIRS})
