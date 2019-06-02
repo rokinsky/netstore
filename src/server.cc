@@ -137,9 +137,12 @@ void server::get(sockaddr_in& ra, uint64_t cmd_seq, const std::string& f) {
   cmd::complex complex(cmd::connect_me, cmd_seq, tcp.port(), f.data());
   udp.send(complex, ra);
 
-  auto msg_tcp = tcp.accept();
-  msg_tcp.upload(path);
-  msg::uploaded(f, inet_ntoa(ra.sin_addr), ra.sin_port);
+  try {
+    auto msg_tcp = tcp.accept();
+    msg_tcp.upload(path);
+  } catch (...) { }
+
+  //msg::uploaded(f, inet_ntoa(ra.sin_addr), ra.sin_port);
 }
 
 void server::del(const std::string& f) {

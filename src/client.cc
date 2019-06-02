@@ -176,7 +176,6 @@ void client::fetch(const std::string& param) {
               << complex.param() << " (" << complex.data << ")" << std::endl;
     try {
       sockets::tcp tcp;
-      tcp.set_timeout({timeout, 0});
       tcp.connect(files[param], complex.param());
       tcp.download(aux::path(out_fldr, complex.data));
       msg::downloaded(param, inet_ntoa(receive_address.sin_addr), complex.param());
@@ -225,7 +224,6 @@ void client::upload(const std::string& param) {
         << cmplx_rcv.param() << " (" << cmplx_rcv.data << ")" << std::endl;
         try {
           sockets::tcp tcp;
-          tcp.set_timeout({timeout, 0});
           tcp.connect(ucast, cmplx_rcv.param());
           tcp.upload(param);
           uploaded = true;
