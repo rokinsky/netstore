@@ -16,12 +16,11 @@
 #include <fstream>
 #include <atomic>
 #include <mutex>
+#include <csignal>
 
 #include "sockets.hh"
 #include "aux.hh"
 #include "cmd.hh"
-
-#define REPEAT_COUNT  30 /* TODO remove it! */
 
 namespace netstore {
 
@@ -178,7 +177,7 @@ void server::add(sockaddr_in& ra, uint64_t cmd_seq, uint64_t fsize, const std::s
 }
 
 void server::run() {
-  while (true) {
+  while (!netstore::quit) {
     try {
       cmd::simple simple;
       sockaddr_in remote_address{};
@@ -235,11 +234,12 @@ int main(int ac, char** av) {
     bpo::variables_map vm;
     store(bpo::parse_command_line(ac, av, desc), vm);
     notify(vm);
-
+    std::signal(SIGINT, netstore::handler);
     netstore::server s(mcast_addr, cmd_port, max_space, shrd_fldr, timeout);
     s.run();
   } catch (...) {
     std::cerr << boost::current_exception_diagnostic_information() << std::endl;
     exit(EXIT_FAILURE);
   }
+  exit(EXIT_SUCCESS);
 }

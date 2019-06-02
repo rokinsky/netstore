@@ -81,6 +81,7 @@ class udp {
 class tcp {
  public:
   static constexpr size_t bsize = 4096 * 512; /* 2 MiB */
+  static constexpr uint8_t default_to = 5;
 
   tcp();
   explicit tcp(uint32_t sock);
@@ -106,11 +107,11 @@ class tcp {
 
   char* buffer();
 
-  void download(const std::string& path);
+  void download(const std::string& path, const std::atomic<bool>& quit = netstore::quit);
 
-  void upload(const std::string& path);
+  void upload(const std::string& path, const std::atomic<bool>& quit = netstore::quit);
 
-  void set_timeout(const timeval& tv);
+  void set_timeout(const timeval& tv = {default_to, 0});
 
  private:
   int sock;

@@ -92,13 +92,12 @@ namespace netstore::sockets {
     sockaddr_in sa{};
     sa.sin_family = AF_INET;
     sa.sin_addr = {.s_addr = htonl(INADDR_ANY)};
-    sa.sin_port = port;
+    sa.sin_port = htons(port);
     if (::bind(sock, (sockaddr *) &sa, sizeof(sa)) < 0)
       throw exception("tcp::bind");
   }
 
   void tcp::listen(uint8_t queue_length) {
-    // switch to listening (passive open)
     if (::listen(sock, queue_length) < 0) throw exception("tcp::listen");
   }
 
@@ -132,12 +131,10 @@ namespace netstore::sockets {
   }
 
   void tcp::write(ssize_t n) {
-    if (::write(sock, _buffer, n) != n)
-      throw exception("tcp::write");
+    if (::write(sock, _buffer, n) != n) throw exception("tcp::write");
   }
 
   ssize_t tcp::read() {
-    bzero(_buffer, bsize);
     ssize_t nread = ::read(sock, _buffer, bsize);
     if (nread < 0) throw exception("tcp::read");
     return nread;
@@ -145,28 +142,25 @@ namespace netstore::sockets {
 
   char* tcp::buffer() { return _buffer; }
 
-  void tcp::download(const std::string& path) {
+  void tcp::download(const std::string& path, const std::atomic<bool>& quit) {
     std::ofstream file(path, std::ofstream::binary | std::ofstream::out | std::ofstream::trunc);
 
     if (file.is_open()) {
       ssize_t nread;
-      while ((nread = read()) > 0) {
+      while (!quit && (nread = read()) > 0) {
         file.write(buffer(), nread);
       }
 
       file.close();
-      std::cout << "file received" << std::endl;
-    } else {
-      std::cout << "error!!! file received" << std::endl;
     }
   }
 
-  void tcp::upload(const std::string& path) {
+  void tcp::upload(const std::string& path, const std::atomic<bool>& quit) {
     std::ifstream file(path, std::ifstream::binary | std::ifstream::in);
     auto fsize = std::filesystem::file_size(path);
 
     if (file.is_open()) {
-      while (fsize > 0) {
+      while (!quit && fsize > 0) {
         auto nread = std::min<std::streamsize>(sockets::tcp::bsize, fsize);
         file.read(buffer(), nread);
         write(file.gcount());
@@ -174,13 +168,13 @@ namespace netstore::sockets {
       }
 
       file.close();
-      std::cout << "file send" << std::endl;
-    } else {
-      std::cout << "error!!! file send" << std::endl;
     }
   }
 
   void tcp::set_timeout(const timeval& tv) {
-    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(timeval));
+    if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(timeval)) < 0)
+      throw exception("tcp::set receive timeout");
+    if (setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(timeval)) < 0)
+      throw exception("tcp::set send timeout");
   }
 }

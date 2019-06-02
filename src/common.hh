@@ -11,6 +11,12 @@
 
 namespace netstore {
 
+static std::atomic<bool> quit{false};
+void handler(int _) {
+  std::cout << "SIGINT handled" << std::endl;
+  quit.store(true);
+}
+
 class exception : public std::exception {
   std::string msg;
 

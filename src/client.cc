@@ -20,6 +20,7 @@
 
 #include <boost/bind.hpp>
 #include <boost/exception/diagnostic_information.hpp>
+#include <csignal>
 
 #include "common.hh"
 #include "sockets.hh"
@@ -46,7 +47,7 @@ class client {
   /* <available memory, multicast address, unicast address> */
   typedef std::tuple<uint64_t, std::string, std::string> mmu_t;
 
-  sockaddr_in set_target(const std::string& addr, in_port_t port);
+  static sockaddr_in set_target(const std::string& addr, in_port_t port);
 
   std::vector<mmu_t> discover(sockets::udp& sock);
 
@@ -250,7 +251,7 @@ void client::connect(sockets::udp& sock) {
 void client::run() {
   std::string line;
 
-  while(std::getline(std::cin, line) && !aux::is_exit(line)) {
+  while(!quit && std::getline(std::cin, line) && !aux::is_exit(line)) {
     std::string param;
     if (aux::is_discover(line)) {
       discover();
@@ -264,8 +265,11 @@ void client::run() {
       t.detach();
     } else if (aux::is_remove(line, param)) {
       remove(param);
+    } else {
+      std::cout << "Warning: wrong command" << std::endl;
     }
   }
+  if (!aux::is_exit(line)) quit.store(true);
 }
 
 sockaddr_in client::set_target(const std::string& addr, in_port_t port) {
@@ -301,10 +305,13 @@ int main(int ac, char** av) {
     store(bpo::parse_command_line(ac, av, desc), vm);
     notify(vm);
 
+    std::signal(SIGINT, netstore::handler);
+
     netstore::client c(mcast_addr, cmd_port, out_fldr, timeout);
     c.run();
   } catch (...) {
     std::cerr << boost::current_exception_diagnostic_information() << std::endl;
     exit(EXIT_FAILURE);
   }
+  exit(EXIT_SUCCESS);
 }
