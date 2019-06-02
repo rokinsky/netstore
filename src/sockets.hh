@@ -5,10 +5,11 @@
 #include <string>
 #include <netinet/in.h>
 #include <netdb.h>
-#include "common.hh"
-#include "aux.hh"
 #include <sys/socket.h>
 #include <thread>
+
+#include "common.hh"
+#include "aux.hh"
 
 namespace netstore::sockets {
 

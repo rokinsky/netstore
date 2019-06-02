@@ -9,7 +9,6 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include "common.hh"
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/time.h>
@@ -19,6 +18,7 @@
 #include <mutex>
 #include <csignal>
 
+#include "common.hh"
 #include "sockets.hh"
 #include "aux.hh"
 #include "cmd.hh"

@@ -5,11 +5,12 @@
 #include <sys/socket.h>
 #include <string>
 #include <iostream>
+#include <boost/filesystem.hpp>
+#include <fstream>
 
 #include "sockets.hh"
 #include "common.hh"
-#include <boost/filesystem.hpp>
-#include <fstream>
+
 
 namespace netstore::sockets {
 udp::udp(const std::string& mcast_addr, in_port_t port) : udp(port) {
