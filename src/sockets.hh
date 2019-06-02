@@ -112,6 +112,6 @@ class tcp {
   char _buffer[bsize];
 };
 
-}
+} // namespace netstore::sockets
 
 #endif // _SOCKETS_HH

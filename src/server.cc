@@ -217,7 +217,7 @@ int main(int ac, char** av) {
        boost::bind(&netstore::aux::check_range<int64_t>, _1, 0, std::numeric_limits<uint16_t>::max(), "p")), "UDP port")
   (",b", bpo::value(&max_space)->default_value(52428800)->notifier(
        boost::bind(&netstore::aux::check_range<int64_t>, _1, 0, std::numeric_limits<int64_t>::max(), "b")), "Allowed space")
-  (",f", bpo::value(&shrd_fldr)->required()->notifier(boost::bind(&netstore::aux::check_dir, _1)),"Shared folder")
+  (",f", bpo::value(&shrd_fldr)->required()->notifier(boost::bind(&netstore::aux::check_dir, _1, "f")),"Shared folder")
   (",t", bpo::value(&timeout)->default_value(5)->notifier(boost::bind(&netstore::aux::check_range<int64_t>, _1, 0, 300, "t")), "Timeout")
   ;
 

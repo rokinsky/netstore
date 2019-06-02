@@ -15,9 +15,7 @@
 #include <vector>
 #include <tuple>
 #include <mutex>
-
 #include <boost/filesystem.hpp>
-
 #include <boost/bind.hpp>
 #include <boost/exception/diagnostic_information.hpp>
 #include <csignal>
@@ -279,7 +277,7 @@ int main(int ac, char** av) {
     (",g", bpo::value(&mcast_addr)->required(), "Multicast address")
     (",p", bpo::value(&cmd_port)->required()->notifier(
         boost::bind(&netstore::aux::check_range<int64_t>, _1, 0, std::numeric_limits<uint16_t>::max(), "p")), "UDP port")
-    (",o", bpo::value(&out_fldr)->required()->notifier(boost::bind(&netstore::aux::check_dir, _1)),"Output folder")
+    (",o", bpo::value(&out_fldr)->required()->notifier(boost::bind(&netstore::aux::check_dir, _1, "o")),"Output folder")
     (",t", bpo::value(&timeout)->default_value(5)->notifier(boost::bind(&netstore::aux::check_range<int64_t>, _1, 0, 300, "t")), "Timeout")
   ;
 

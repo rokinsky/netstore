@@ -1,11 +1,12 @@
-#ifndef NETSTORE_2_AUX_HH
-#define NETSTORE_2_AUX_HH
+#ifndef _AUX_HH
+#define _AUX_HH
 
 #include <string>
 #include <boost/filesystem.hpp>
 #include <chrono>
 
 namespace netstore::aux {
+
 bool is_discover(const std::string& s);
 
 bool is_search(const std::string& s, std::string& param);
@@ -18,7 +19,7 @@ bool is_remove(const std::string& s, std::string& param);
 
 bool is_exit(const std::string& s);
 
-void check_dir(const std::string& s);
+void check_dir(const std::string& s, const std::string& param);
 
 template <typename T>
 void check_range(T value, T min, T max, const std::string& param) {
@@ -49,6 +50,7 @@ struct timeval to_timeval(Duration&& d) {
   tv.tv_usec = std::chrono::duration_cast<std::chrono::microseconds>(d - sec).count();
   return tv;
 }
-}  // namespace netstore::aux
 
-#endif  // NETSTORE_2_AUX_HH
+} // namespace netstore::aux
+
+#endif // _AUX_HH

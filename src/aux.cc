@@ -40,11 +40,11 @@ namespace netstore::aux {
 
   bool is_exit(const std::string& s) { return s == "exit"; }
 
-  void check_dir(const std::string& s) {
+  void check_dir(const std::string& s, const std::string& param) {
     namespace bpo = boost::program_options;
     if (!boost::filesystem::is_directory(s))
       throw bpo::validation_error(
-          bpo::validation_error::invalid_option_value, "f", s
+          bpo::validation_error::invalid_option_value, param, s
       );
   }
 }
