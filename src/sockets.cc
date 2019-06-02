@@ -8,23 +8,19 @@
 
 #include "sockets.hh"
 #include "common.hh"
+#include <filesystem>
+#include <fstream>
 
 namespace netstore::sockets {
-  udp::udp(const std::string& addr, in_port_t port) : udp(port) {
-    set_multicast(addr);
+  udp::udp(const std::string& mcast_addr, in_port_t port) : udp(port) {
+    set_multicast(mcast_addr);
   }
 
-  udp::udp(in_port_t port) : udp() {
-    bind_local(port);
-  }
+  udp::udp(in_port_t port) : udp() { bind_local(port); }
 
-  udp::udp() {
-    open();
-  }
+  udp::udp() : ip_mreq({}), sock(0) { open(); }
 
-  udp::~udp() {
-    close();
-  }
+  udp::~udp() { close(); }
 
   void udp::open() {
     sock = socket(AF_INET, SOCK_DGRAM, 0);
@@ -62,9 +58,7 @@ namespace netstore::sockets {
       throw exception("udp::setsockopt unset multicast");
   }
 
-  void udp::close() {
-    ::close(sock);
-  }
+  void udp::close() { ::close(sock); }
 
   void udp::set_broadcast() {
     int optval = 1;
@@ -77,13 +71,11 @@ namespace netstore::sockets {
     setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(timeval));
   }
 
-  tcp::tcp() : sock(0) { open(); }
+  tcp::tcp() : sock(0), _buffer() { open(); }
 
-  tcp::tcp(uint32_t sock) : sock(sock) {}
+  tcp::tcp(uint32_t sock) : sock(sock), _buffer() {}
 
-  tcp::~tcp() {
-    close();
-  }
+  tcp::~tcp() { close(); }
 
   tcp tcp::accept() {
     sockaddr_in client_address{};
@@ -148,13 +140,46 @@ namespace netstore::sockets {
   }
 
   ssize_t tcp::read() {
-    bzero(_buffer, buffer_size);
-    ssize_t nread = ::read(sock, _buffer, buffer_size);
+    bzero(_buffer, bsize);
+    ssize_t nread = ::read(sock, _buffer, bsize);
     if (nread < 0) throw exception("tcp::read");
     return nread;
   }
 
-  char* tcp::buffer() {
-    return _buffer;
+  char* tcp::buffer() { return _buffer; }
+
+  void tcp::download(const std::string& path) {
+    std::ofstream file(path, std::ofstream::binary | std::ofstream::out | std::ofstream::trunc);
+
+    if (file.is_open()) {
+      ssize_t nread;
+      while ((nread = read()) > 0) {
+        file.write(buffer(), nread);
+      }
+
+      file.close();
+      std::cout << "file received" << std::endl;
+    } else {
+      std::cout << "error!!! file received" << std::endl;
+    }
+  }
+
+  void tcp::upload(const std::string& path) {
+    std::ifstream file(path, std::ifstream::binary | std::ifstream::in);
+    auto fsize = std::filesystem::file_size(path);
+
+    if (file.is_open()) {
+      while (fsize > 0) {
+        auto nread = std::min<std::streamsize>(sockets::tcp::bsize, fsize);
+        file.read(buffer(), nread);
+        write(file.gcount());
+        fsize -= file.gcount();
+      }
+
+      file.close();
+      std::cout << "file send" << std::endl;
+    } else {
+      std::cout << "error!!! file send" << std::endl;
+    }
   }
 }

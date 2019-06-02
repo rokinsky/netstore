@@ -10,16 +10,16 @@ namespace netstore::aux {
 
   bool is_fetch(const std::string& s, std::string& param);
 
-  bool is_upload(const std::string& s);
+  bool is_upload(const std::string& s, std::string& param);
 
-  bool is_remove(const std::string& s);
+  bool is_remove(const std::string& s, std::string& param);
 
   bool is_exit(const std::string& s);
 
   void check_dir(const std::string& s);
 
   template<typename T>
-  void check_range(const T& value, const T& min, const T& max, const std::string& param) {
+  void check_range(T value, T min, T max, const std::string& param) {
     namespace bpo = boost::program_options;
     if (value < min || value > max) {
       throw bpo::validation_error(
@@ -33,7 +33,11 @@ namespace netstore::aux {
   }
 
   inline bool validate(const std::string& filename) {
-    return !(filename.empty() || filename.find('/', 0) != std::string::npos);
+    return !filename.empty() && filename.find('/', 0) == std::string::npos;
+  }
+
+  inline bool exists(const std::string& path) {
+    return std::filesystem::exists(path);
   }
 }
 

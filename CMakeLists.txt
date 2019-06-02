@@ -14,6 +14,7 @@ add_library(nssockets src/sockets.cc)
 add_library(nsaux src/aux.cc)
 add_library(nscmd src/cmd.cc)
 target_link_libraries(nsaux stdc++fs)
+target_link_libraries(nssockets stdc++fs)
 
 # http://stackoverflow.com/questions/10555706/
 macro (add_executable _name)

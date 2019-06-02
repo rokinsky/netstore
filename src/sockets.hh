@@ -20,7 +20,8 @@ class udp {
   void close();
 
  public:
-  udp(const std::string &addr, in_port_t port);
+  /* only for multicast usage */
+  udp(const std::string &mcast_addr, in_port_t port);
 
   explicit udp(in_port_t port);
 
@@ -41,14 +42,14 @@ class udp {
   void set_timeout(__time_t sec, __suseconds_t usec);
 
   template<typename C>
-  void send(C &msg, sockaddr_in &ra) {
+  void send(C& msg, sockaddr_in& ra) {
     if (sendto(sock, &msg, msg.size(), 0, (sockaddr *) &ra,
                sizeof(ra)) != msg.size())
       throw exception("udp::send");
   }
 
   template<typename C>
-  ssize_t recv(C &msg, sockaddr_in &ra) {
+  ssize_t recv(C& msg, sockaddr_in& ra) {
     ssize_t rcv_len = 0;
     socklen_t remote_len = sizeof(sockaddr_in);
     rcv_len = recvfrom(sock, &msg, sizeof(msg), 0, (sockaddr *) &ra,
@@ -62,7 +63,7 @@ class udp {
 
 class tcp {
  public:
-  static constexpr size_t buffer_size = 4096 * 512; /* 2 MiB */
+  static constexpr size_t bsize = 4096 * 512; /* 2 MiB */
 
   tcp();
   explicit tcp(uint32_t sock);
@@ -83,13 +84,18 @@ class tcp {
 
   in_port_t port();
 
-  void write(ssize_t n = buffer_size);
+  void write(ssize_t n = bsize);
   ssize_t read();
 
   char* buffer();
+
+  void download(const std::string& path);
+
+  void upload(const std::string& path);
+
  private:
   int sock;
-  char _buffer[buffer_size];
+  char _buffer[bsize];
 };
 
 }

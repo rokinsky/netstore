@@ -64,6 +64,10 @@ Lubię to!
 #include <string>
 #include <regex>
 #include <unordered_map>
+#include <vector>
+#include <tuple>
+#include <mutex>
+
 #include <boost/bind.hpp>
 #include <boost/exception/diagnostic_information.hpp>
 
@@ -82,25 +86,30 @@ class client {
    client(std::string ma, in_port_t cp, std::string of, uint8_t t)
     : mcast_addr(std::move(ma))
     , cmd_port(cp)
-    , mcast_sockaddr({})
+    , mcast_sockaddr(set_target(mcast_addr, cmd_port))
     , out_fldr(std::move(of))
     , timeout(t)
     , udp(0)
    {}
 
-   //~client();
-
    void connect();
    void run();
 
  private:
-  void set_target();
+  /* memo, mcast_addr, ucast_addr */
+  typedef std::tuple<uint64_t, std::string, std::string> mmu_t;
 
-  void discover();
+  sockaddr_in set_target(const std::string& addr, in_port_t port);
+
+  std::vector<mmu_t> discover();
+
+  static void print_servers(const std::vector<mmu_t>& servers);
 
   void search(const std::string& pattern);
 
   void fetch(const std::string& param);
+
+  void upload(const std::string& param);
 
   std::string mcast_addr;
   in_port_t cmd_port;
@@ -109,9 +118,11 @@ class client {
   uint8_t timeout;
   sockets::udp udp;
   std::unordered_map<std::string, std::string> files;
+  std::mutex m;
 };
 
-void client::discover() {
+std::vector<client::mmu_t> client::discover() {
+  std::vector<mmu_t> servers;
   printf("Sending request...\n");
   cmd::simple simple { cmd::hello, 10 };
 
@@ -124,11 +135,19 @@ void client::discover() {
     printf("Waiting for response...\n");
     cmd::complex complex;
     rcv_len = udp.recv(complex, ra);
-    if (rcv_len >= 0 && cmd::validate(complex, simple, cmd::good_day)) {
-      std::cout << "Found " << inet_ntoa(ra.sin_addr) << " (" << complex.data << ") with free space " << complex.param() << std::endl;
-    }
+    if (rcv_len >= 0 && cmd::validate(complex, simple, cmd::good_day))
+      servers.emplace_back(std::make_tuple(complex.param(),
+          std::string(complex.data), std::string(inet_ntoa(ra.sin_addr))));
   }
   printf("Didn't get any response. Break request.\n");
+
+  std::sort(servers.begin(), servers.end());
+
+  return servers;
+}
+
+void client::print_servers(const std::vector<mmu_t>& servers) {
+  for (const auto& [mem, mcast, ucast]: servers) msg::found(ucast, mcast, mem);
 }
 
 void client::search(const std::string& pattern) {
@@ -161,7 +180,7 @@ void client::search(const std::string& pattern) {
           }
           std::string filename(rcved.data + start, rcved.data + end);
           files[filename] = std::string(inet_ntoa(ra.sin_addr));
-          std::cout << filename << " (" << inet_ntoa(ra.sin_addr) << ")" << std::endl;
+          msg::searched(filename, inet_ntoa(ra.sin_addr));
         }
       } else {
         // TODO error
@@ -172,46 +191,88 @@ void client::search(const std::string& pattern) {
 }
 
 void client::fetch(const std::string& param) {
-  if (files.find(param) == files.end()) {
+  std::string addr;
+  {
+    std::unique_lock lk(m);
+    addr = files[param];
+  }
+
+  if (addr.empty()) {
     std::cout << "nie ma pliku" << std::endl;
     return;
   }
 
-  auto server_address = mcast_sockaddr;
-  if (inet_aton(files[param].c_str(), &server_address.sin_addr) == 0)
-    throw std::runtime_error("inet_aton");
-
   printf("Sending request...\n");
+
+  auto server_address = set_target(addr, cmd_port);
+
   cmd::simple simple { cmd::get, 10, param.data() };
   udp.send(simple, server_address);
 
-  ssize_t rcv_len = 0;
   printf("Waiting for response...\n");
   cmd::complex complex;
-  rcv_len = udp.recv(complex, server_address);
+
+  ssize_t rcv_len = udp.recv(complex, server_address);
 
   if (rcv_len >= 0 && cmd::validate(complex, simple, cmd::connect_me)) {
     std::cout << "Connect_me " << inet_ntoa(server_address.sin_addr) << ":" << complex.param() << " (" << complex.data << ")" << std::endl;
 
-    const auto path = aux::path(out_fldr, complex.data);
-    std::ofstream file(path, std::ofstream::binary | std::ofstream::out | std::ofstream::trunc);
-
-    if (file.is_open()) {
-      sockets::tcp tcp;
-      tcp.connect(files[param], complex.param());
-
-      ssize_t nread;
-      while ((nread = tcp.read()) > 0) {
-        file.write(tcp.buffer(), nread);
-      }
-
-      file.close();
-      std::cout << "file received" << std::endl;
-    } else {
-      std::cout << "error!!! file received" << std::endl;
-    }
+    sockets::tcp tcp;
+    tcp.connect(files[param], complex.param());
+    tcp.download(aux::path(out_fldr, complex.data));
   } else {
-    std::cout << "blad" << std::endl;
+    std::cout << "blad " << std::strerror(errno) << std::endl;
+  }
+}
+
+void client::upload(const std::string& param) {
+  if (!aux::exists(param)) {
+    msg::not_exists(param);
+    return;
+  }
+
+  auto servers = discover();
+  print_servers(servers);
+  auto uploaded = false;
+
+  sockets::udp udp_msg(0);
+  udp_msg.set_ttl(TTL_VALUE);
+  udp_msg.set_timeout(timeout, 0);
+
+  while (!servers.empty() || !uploaded) {
+    const auto& [mem, mcast, ucast] = servers.back();
+    servers.pop_back();
+    auto sockaddr = set_target(ucast, cmd_port);
+    cmd::complex cmplx_snd { cmd::add, 10,
+                         std::filesystem::file_size(param),
+                         std::filesystem::path(param).filename().c_str()
+                         };
+    printf("UPLOAD: Sending request\n");
+    udp_msg.send(cmplx_snd, sockaddr);
+    printf("UPLOAD: Waiting for response...\n");
+    cmd::simple simple {};
+    udp_msg.recv(simple, sockaddr);
+    if (cmd::validate(simple, cmplx_snd, cmd::no_way) && simple.is_empty_data()) {
+      continue;
+    } else if (cmd::validate(simple, cmplx_snd, cmd::can_add)) {
+      cmd::complex cmplx_rcv(&simple);
+      if (cmplx_rcv.is_empty_data() && ucast == inet_ntoa(sockaddr.sin_addr)) {
+        std::cout << "Connect_me " << inet_ntoa(sockaddr.sin_addr) << ":" << cmplx_rcv.param() << " (" << cmplx_rcv.data << ")" << std::endl;
+        sockets::tcp tcp;
+        tcp.connect(ucast, cmplx_rcv.param());
+        tcp.upload(param);
+        uploaded = true;
+        msg::uploaded(param, inet_ntoa(sockaddr.sin_addr), sockaddr.sin_port);
+        continue;
+      }
+    }
+    msg::skipping(inet_ntoa(sockaddr.sin_addr), sockaddr.sin_port);
+  }
+
+  if (!uploaded) {
+    msg::too_big(param);
+  } else {
+
   }
 }
 
@@ -221,8 +282,6 @@ void client::connect() {
   udp.set_broadcast();
   udp.set_ttl(TTL_VALUE);
   udp.set_timeout(timeout, 0);
-
-  set_target();
 }
 
 void client::run() {
@@ -234,16 +293,17 @@ void client::run() {
     std::string param;
     if (aux::is_discover(line)) {
       std::cout << "!!discover" << std::endl;
-      discover();
+      print_servers(discover());
     } else if (aux::is_search(line, param)) {
       std::cout << "!!searched word: " << param << std::endl;
       search(param);
     } else if (aux::is_fetch(line, param)) {
       std::cout << "!!fetch" << std::endl;
       fetch(param);
-    } else if (aux::is_upload(line)) {
+    } else if (aux::is_upload(line, param)) {
       std::cout << "!!upload" << std::endl;
-    } else if (aux::is_remove(line)) {
+      upload(param);
+    } else if (aux::is_remove(line, param)) {
       std::cout << "!!remove" << std::endl;
     }
     std::cout << line << std::endl;
@@ -252,11 +312,14 @@ void client::run() {
   printf("Closing.\n");
 }
 
-void client::set_target() {
-  mcast_sockaddr.sin_family = AF_INET;
-  mcast_sockaddr.sin_port = htons(cmd_port);
-  if (inet_aton(mcast_addr.c_str(), &mcast_sockaddr.sin_addr) == 0)
+sockaddr_in client::set_target(const std::string& addr, in_port_t port) {
+  sockaddr_in sockaddr{};
+  sockaddr.sin_family = AF_INET;
+  sockaddr.sin_port = htons(port);
+  if (inet_aton(addr.c_str(), &sockaddr.sin_addr) == 0)
     throw std::runtime_error("inet_aton");
+
+  return sockaddr;
 }
 
 } // namespace netstore

@@ -93,8 +93,16 @@ namespace netstore::cmd {
       return be64toh(_param);
     }
 
+    inline size_t data_size() {
+      return strlen(data);
+    }
+
     inline ssize_t size() {
       return sizeof(cmd) + sizeof(_cmd_seq) + sizeof(_param) + strlen(data);
+    }
+
+    inline bool is_empty_data() {
+      return data_size() == 0;
     }
   };
 

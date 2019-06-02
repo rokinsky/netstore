@@ -14,12 +14,13 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <fstream>
+#include <atomic>
 
 #include "sockets.hh"
 #include "aux.hh"
 #include "cmd.hh"
 
-#define REPEAT_COUNT  30
+#define REPEAT_COUNT  30 /* TODO remove it! */
 
 namespace netstore {
 
@@ -30,6 +31,7 @@ class server {
    , cmd_port(cp)
    , max_space(ms)
    , shrd_fldr(std::move(sf))
+   , available_space()
    , timeout(t)
    , udp(mcast_addr, cmd_port)
   {
@@ -48,17 +50,17 @@ class server {
   in_port_t cmd_port;
   int64_t max_space;
   std::string shrd_fldr;
-  uint64_t available_space;
+  std::atomic<uint64_t> available_space;
   uint8_t timeout;
   sockets::udp udp;
 
   std::unordered_map<std::string, uint64_t> files;
 
   void hello(sockaddr_in& ra, uint64_t cmd_seq);
-  void list(sockaddr_in& ra, uint64_t cmd_seq, const std::string& s);
-  void get(sockaddr_in& ra, uint64_t cmd_seq, const std::string& s);
-  void del();
-  void add();
+  void list(sockaddr_in& ra, uint64_t cmd_seq, const std::string& f);
+  void get(sockaddr_in& ra, uint64_t cmd_seq, const std::string& f);
+  void del(sockaddr_in& ra, uint64_t cmd_seq, const std::string& f);
+  void add(sockaddr_in& ra, uint64_t cmd_seq, uint64_t fsize, const std::string& f);
 
   uint64_t index_files();
 
@@ -110,34 +112,42 @@ void server::list(sockaddr_in& ra, uint64_t cmd_seq, const std::string& s) {
   }
 }
 
-void server::get(sockaddr_in& ra, uint64_t cmd_seq, const std::string& s) {
-  if (not aux::validate(s))
-    return;
+void server::get(sockaddr_in& ra, uint64_t cmd_seq, const std::string& f) {
+  const auto path = aux::path(shrd_fldr, f);
+  if (!aux::validate(f) || !aux::exists(path)) return;
 
   sockets::tcp tcp;
   tcp.bind();
   tcp.listen();
-  cmd::complex complex(cmd::connect_me, cmd_seq, tcp.port(), s.data());
+  cmd::complex complex(cmd::connect_me, cmd_seq, tcp.port(), f.data());
   udp.send(complex, ra);
 
   auto msg_tcp = tcp.accept();
-  const auto path = aux::path(shrd_fldr, s);
-  std::ifstream file(path, std::ifstream::binary | std::ifstream::in);
-  auto file_size = std::filesystem::file_size(path);
+  msg_tcp.upload(path);
+  msg::uploaded(f, inet_ntoa(ra.sin_addr), ra.sin_port);
+}
 
-  if (file.is_open()) {
-    while (file_size > 0) {
-      auto nread = std::min<std::streamsize>(sockets::tcp::buffer_size, file_size);
-      file.read(msg_tcp.buffer(), nread);
-      msg_tcp.write(file.gcount());
-      file_size -= file.gcount();
-    }
+void server::del(sockaddr_in& ra, uint64_t cmd_seq, const std::string& f) {
+  if (!aux::validate(f) || !aux::exists(aux::path(shrd_fldr, f))) return;
+}
 
-    file.close();
-    std::cout << "file send" << std::endl;
-  } else {
-    std::cout << "error!!! file send" << std::endl;
+void server::add(sockaddr_in& ra, uint64_t cmd_seq, uint64_t fsize, const std::string& f) {
+  const auto path = aux::path(shrd_fldr, f);
+  if (!aux::validate(f) || aux::exists(path) || fsize > available_space) {
+    cmd::simple simple(cmd::no_way, cmd_seq, f.data());
+    udp.send(simple, ra);
+    return;
   }
+
+  available_space.fetch_sub(fsize);
+  sockets::tcp tcp;
+  tcp.bind();
+  tcp.listen();
+  cmd::complex complex(cmd::can_add, cmd_seq, tcp.port());
+  udp.send(complex, ra);
+
+  auto msg_tcp = tcp.accept();
+  msg_tcp.download(path);
 }
 
 void server::run() {
@@ -156,13 +166,14 @@ void server::run() {
     if (cmd::eq(simple.cmd, cmd::hello) && simple.is_empty_data()) {
       hello(remote_address, simple.cmd_seq());
     } else if (cmd::eq(simple.cmd, cmd::list)) {
-      list(remote_address, simple.cmd_seq(), std::string(simple.data));
+      list(remote_address, simple.cmd_seq(), simple.data);
     } else if (cmd::eq(simple.cmd, cmd::get)) {
-      get(remote_address, simple.cmd_seq(), std::string(simple.data));
+      get(remote_address, simple.cmd_seq(), simple.data);
     } else if (cmd::eq(simple.cmd, cmd::del)) {
-
+      del(remote_address, simple.cmd_seq(), simple.data);
     } else if (cmd::eq(simple.cmd, cmd::add)) {
       cmd::complex complex(&simple);
+      add(remote_address, complex.cmd_seq(), complex.param(), complex.data);
     } else {
       std::cerr << "[PCKG ERROR] Skipping invalid package from "
       << inet_ntoa(remote_address.sin_addr) << ":"
