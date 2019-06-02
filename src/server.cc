@@ -64,8 +64,6 @@ class server {
 
   uint64_t index_files();
 
-  void read_cmd(cmd::simple& cmd, sockaddr_in& remote);
-
   void set_space(uint64_t value) {
     if (available_space > 0) throw std::logic_error("available space is not zero");
     available_space = max_space < value ? 0 : max_space - value;

@@ -180,7 +180,7 @@ void client::fetch(const std::string& param) {
       tcp.download(aux::path(out_fldr, complex.data));
       msg::downloaded(param, inet_ntoa(receive_address.sin_addr), complex.param());
     } catch (...) {
-      msg::downloading_failed(param, inet_ntoa(receive_address.sin_addr), complex.param(), "");
+      msg::downloading_failed(param, inet_ntoa(receive_address.sin_addr), complex.param(), boost::current_exception_diagnostic_information());
     }
   } else {
     msg::downloading_failed(param, "", 0, "");
@@ -224,7 +224,7 @@ void client::upload(const std::string& param) {
           uploaded = true;
           msg::uploaded(param, ucast, cmplx_rcv.param());
         } catch (...) {
-          msg::uploading_failed(param, ucast, cmplx_rcv.param(), "");
+          msg::uploading_failed(param, ucast, cmplx_rcv.param(), boost::current_exception_diagnostic_information());
         }
         continue;
       }
@@ -257,14 +257,10 @@ void client::run() {
     } else if (aux::is_search(line, param)) {
       search(param);
     } else if (aux::is_fetch(line, param)) {
-      std::thread t{[=] () mutable {
-        fetch(param);
-      }};
+      std::thread t{[=] { fetch(param); }};
       t.detach();
     } else if (aux::is_upload(line, param)) {
-      std::thread t{[=] () mutable {
-        upload(param);
-      }};
+      std::thread t{[=] { upload(param); }};
       t.detach();
     } else if (aux::is_remove(line, param)) {
       remove(param);
