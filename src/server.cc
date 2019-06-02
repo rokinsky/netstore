@@ -15,6 +15,7 @@
 #include <sys/time.h>
 #include <fstream>
 #include <atomic>
+#include <mutex>
 
 #include "sockets.hh"
 #include "aux.hh"
@@ -50,10 +51,11 @@ class server {
   in_port_t cmd_port;
   int64_t max_space;
   std::string shrd_fldr;
-  std::atomic<uint64_t> available_space;
   uint8_t timeout;
   sockets::udp udp;
 
+  std::mutex m; /* mutex for available space and files */
+  uint64_t available_space;
   std::unordered_map<std::string, uint64_t> files;
 
   void hello(sockaddr_in& ra, uint64_t cmd_seq);
@@ -89,6 +91,7 @@ ssize_t server::read_cmd(cmd::simple& cmd, sockaddr_in& remote) {
 }
 
 void server::hello(sockaddr_in& ra, uint64_t cmd_seq) {
+  std::unique_lock lk(m);
   cmd::complex complex(cmd::good_day, cmd_seq, available_space, mcast_addr.c_str());
   udp.send(complex, ra);
 }
@@ -131,28 +134,36 @@ void server::del(const std::string& f) {
   const auto path = aux::path(shrd_fldr, f);
   if (!aux::validate(f) || !aux::exists(path)) return;
   std::filesystem::remove(path);
-  available_space.fetch_add(files[f]);
-  files.erase(f);
+
+  {
+    std::unique_lock lk(m);
+    available_space = std::min<uint64_t>(files[f] + available_space, max_space);
+    files.erase(f);
+  }
 }
 
 void server::add(sockaddr_in& ra, uint64_t cmd_seq, uint64_t fsize, const std::string& f) {
   const auto path = aux::path(shrd_fldr, f);
-  if (!aux::validate(f) || aux::exists(path) || fsize > available_space) {
-    cmd::simple simple(cmd::no_way, cmd_seq, f.data());
-    udp.send(simple, ra);
-    return;
+  {
+    std::unique_lock lk(m);
+    if (!aux::validate(f) || aux::exists(path) || fsize > available_space) {
+      cmd::simple simple(cmd::no_way, cmd_seq, f.data());
+      udp.send(simple, ra);
+      return;
+    }
+    available_space -= fsize;
+    files[f] = fsize;
   }
-
-  available_space.fetch_sub(fsize);
   sockets::tcp tcp;
   tcp.bind();
   tcp.listen();
+  /* TODO set timeout on TCP socket */
   cmd::complex complex(cmd::can_add, cmd_seq, tcp.port());
   udp.send(complex, ra);
 
   auto msg_tcp = tcp.accept();
   msg_tcp.download(path);
-  files[f] = std::filesystem::file_size(path);
+  /* TODO if error download then acquire mutex and available space += file size and erase files[f] */
 }
 
 void server::run() {

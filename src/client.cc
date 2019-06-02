@@ -26,9 +26,6 @@
 #include "aux.hh"
 #include "cmd.hh"
 
-#define TTL_VALUE     4
-#define REPEAT_COUNT  3
-
 namespace netstore {
 
 class client {
@@ -46,7 +43,7 @@ class client {
    void run();
 
  private:
-  /* mem, mcast_addr, ucast_addr */
+  /* <available memory, multicast address, unicast address> */
   typedef std::tuple<uint64_t, std::string, std::string> mmu_t;
 
   sockaddr_in set_target(const std::string& addr, in_port_t port);
@@ -73,6 +70,8 @@ class client {
   sockets::udp udp;
   std::unordered_map<std::string, std::string> files;
   std::mutex m;
+
+  static constexpr uint8_t ttl_value = 4;
 };
 
 uint64_t client::cmd_seq() {
@@ -242,7 +241,7 @@ void client::remove(const std::string& param) {
 
 void client::connect(sockets::udp& sock) {
   sock.set_broadcast();
-  sock.set_ttl(TTL_VALUE);
+  sock.set_ttl(ttl_value);
   sock.set_timeout(timeval{timeout, 0});
 }
 
