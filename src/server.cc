@@ -27,18 +27,15 @@ namespace netstore {
 
 class server {
  public:
-  server(std::string ma, uint16_t cp, int64_t ms, std::string sf, uint8_t t)
+  server(std::string ma, uint16_t cp, uint64_t ms, std::string sf, uint8_t t)
    : mcast_addr(std::move(ma))
    , cmd_port(cp)
    , max_space(ms)
    , shrd_fldr(std::move(sf))
-   , available_space()
+   , available_space(0)
    , timeout(t)
    , udp(mcast_addr, cmd_port)
-  {
-    available_space = std::max<int64_t>(0, max_space - index_files());
-    std::cout << "available space: " << available_space << std::endl;
-  }
+  { set_space(index_files()); }
 
   void run();
 
@@ -49,14 +46,15 @@ class server {
  private:
   std::string mcast_addr;
   in_port_t cmd_port;
-  int64_t max_space;
+  uint64_t max_space;
   std::string shrd_fldr;
-  uint8_t timeout;
-  sockets::udp udp;
 
   std::mutex m; /* mutex for available space and files */
   uint64_t available_space;
   std::unordered_map<std::string, uint64_t> files;
+
+  uint8_t timeout;
+  sockets::udp udp;
 
   void hello(sockaddr_in& ra, uint64_t cmd_seq);
   void list(sockaddr_in& ra, uint64_t cmd_seq, const std::string& f);
@@ -67,6 +65,19 @@ class server {
   uint64_t index_files();
 
   ssize_t read_cmd(cmd::simple& cmd, sockaddr_in& remote);
+
+  void set_space(uint64_t value) {
+    if (available_space > 0) throw std::logic_error("available space is not zero");
+    available_space = max_space < value ? 0 : max_space - value;
+  }
+
+  void inc_space(uint64_t value) {
+    available_space = max_space - available_space < value ? max_space : value + available_space;
+  }
+
+  void dec_space(uint64_t value) {
+    available_space = max_space - available_space < value ? 0 : available_space - value;
+  }
 };
 
 uint64_t server::index_files() {
@@ -137,7 +148,7 @@ void server::del(const std::string& f) {
 
   {
     std::unique_lock lk(m);
-    available_space = std::min<uint64_t>(files[f] + available_space, max_space);
+    inc_space(files[f]);
     files.erase(f);
   }
 }
@@ -146,12 +157,12 @@ void server::add(sockaddr_in& ra, uint64_t cmd_seq, uint64_t fsize, const std::s
   const auto path = aux::path(shrd_fldr, f);
   {
     std::unique_lock lk(m);
-    if (!aux::validate(f) || aux::exists(path) || fsize > available_space) {
+    if (!aux::validate(f) || files.find(f) != files.end() || fsize > available_space) {
       cmd::simple simple(cmd::no_way, cmd_seq, f.data());
       udp.send(simple, ra);
       return;
     }
-    available_space -= fsize;
+    dec_space(fsize);
     files[f] = fsize;
   }
   sockets::tcp tcp;
@@ -161,9 +172,15 @@ void server::add(sockaddr_in& ra, uint64_t cmd_seq, uint64_t fsize, const std::s
   cmd::complex complex(cmd::can_add, cmd_seq, tcp.port());
   udp.send(complex, ra);
 
-  auto msg_tcp = tcp.accept();
-  msg_tcp.download(path);
-  /* TODO if error download then acquire mutex and available space += file size and erase files[f] */
+  try {
+    auto msg_tcp = tcp.accept();
+    msg_tcp.download(path);
+    /* TODO if error download then acquire mutex and available space += file size and erase files[f] */
+  } catch (...) {
+    std::unique_lock lk(m);
+    dec_space(fsize);
+    files.erase(f);
+  }
 }
 
 void server::run() {

@@ -206,11 +206,11 @@ void client::upload(const std::string& param) {
     cmd::simple simple {};
     udp_msg.recv(simple, sockaddr);
 
-    if (cmd::validate(simple, cmplx_snd, cmd::no_way) && simple.is_empty_data()) {
+    if (cmd::validate(simple, cmplx_snd, cmd::no_way) && simple.data == param) {
       continue;
     } else if (cmd::validate(simple, cmplx_snd, cmd::can_add)) {
       cmd::complex cmplx_rcv(&simple);
-      if (cmplx_rcv.is_empty_data() && ucast == inet_ntoa(sockaddr.sin_addr)) {
+      if (cmplx_rcv.data == param && ucast == inet_ntoa(sockaddr.sin_addr)) {
         std::cout << "Connect_me " << inet_ntoa(sockaddr.sin_addr) << ":"
         << cmplx_rcv.param() << " (" << cmplx_rcv.data << ")" << std::endl;
         sockets::tcp tcp;
