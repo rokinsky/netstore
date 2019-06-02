@@ -111,6 +111,8 @@ class client {
 
   void upload(const std::string& param);
 
+  static uint64_t cmd_seq();
+
   std::string mcast_addr;
   in_port_t cmd_port;
   sockaddr_in mcast_sockaddr;
@@ -121,14 +123,19 @@ class client {
   std::mutex m;
 };
 
+uint64_t client::cmd_seq() {
+  static thread_local uint64_t cmd_seq = 0;
+  return ++cmd_seq;
+}
+
 std::vector<client::mmu_t> client::discover() {
   std::vector<mmu_t> servers;
   printf("Sending request...\n");
-  cmd::simple simple { cmd::hello, 10 };
+  cmd::simple simple { cmd::hello, cmd_seq() };
 
   udp.send(simple, mcast_sockaddr);
 
-  udp.do_until(timeout, [&] () {
+  udp.do_until(timeout, [&] {
     printf("Waiting for response...\n");
     cmd::complex complex;
     sockaddr_in ra{};
@@ -151,18 +158,15 @@ void client::print_servers(const std::vector<mmu_t>& servers) {
 void client::search(const std::string& pattern) {
   printf("Sending request...\n");
   files.clear();
-  cmd::simple simple { cmd::list, 10, pattern.data() };
+  cmd::simple simple { cmd::list, cmd_seq(), pattern.data() };
 
   udp.send(simple, mcast_sockaddr);
 
-  ssize_t rcv_len = 0;
-  sockaddr_in ra{};
-
-  while (rcv_len >= 0) {
+  udp.do_until (timeout, [&] {
     printf("Waiting for response...\n");
     cmd::simple rcved;
-    rcv_len = udp.recv(rcved, ra);
-    if (rcv_len >= 0) {
+    sockaddr_in ra{};
+    if (udp.recv(rcved, ra) > 0) {
       printf("address: %s:%d\n", inet_ntoa(ra.sin_addr),
              ntohs(ra.sin_port));
       if (cmd::validate(rcved, simple, cmd::my_list)) {
@@ -184,8 +188,8 @@ void client::search(const std::string& pattern) {
         // TODO error
       }
     }
-  }
-  printf("Didn't get any response. Break request.\n");
+  });
+  printf("Timeout end\n");
 }
 
 void client::fetch(const std::string& param) {
@@ -204,7 +208,7 @@ void client::fetch(const std::string& param) {
 
   auto server_address = set_target(addr, cmd_port);
 
-  cmd::simple simple { cmd::get, 10, param.data() };
+  cmd::simple simple { cmd::get, cmd_seq(), param.data() };
   udp.send(simple, server_address);
 
   printf("Waiting for response...\n");
@@ -241,7 +245,7 @@ void client::upload(const std::string& param) {
     const auto& [mem, mcast, ucast] = servers.back();
     servers.pop_back();
     auto sockaddr = set_target(ucast, cmd_port);
-    cmd::complex cmplx_snd { cmd::add, 10,
+    cmd::complex cmplx_snd { cmd::add, cmd_seq(),
                          std::filesystem::file_size(param),
                          std::filesystem::path(param).filename().c_str()
                          };
