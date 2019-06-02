@@ -104,7 +104,7 @@ namespace netstore::sockets {
 
   void tcp::connect(const std::string& addr, in_port_t port) {
     sockaddr_in sa{};
-    sa.sin_port = port;
+    sa.sin_port = htons(port);
     sa.sin_family = AF_INET;
     if (inet_aton(addr.c_str(), &sa.sin_addr) == 0)
       throw exception("tcp::inet_aton");
@@ -119,7 +119,7 @@ namespace netstore::sockets {
     if (getsockname(sock, (sockaddr*) &addr, &addrlen) < 0)
       throw exception("tcp::getsockname");
 
-    return addr.sin_port;
+    return ntohs(addr.sin_port);
   }
 
   void tcp::open() {

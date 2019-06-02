@@ -123,6 +123,7 @@ void server::get(sockaddr_in& ra, uint64_t cmd_seq, const std::string& f) {
     tcp.bind();
     tcp.listen();
     tcp.set_timeout({timeout, 0});
+    std::cout << "opened port: " << tcp.port() << std::endl;
 
     cmd::complex complex(cmd::connect_me, cmd_seq, tcp.port(), f.data());
     udp.send(complex, ra);
@@ -162,6 +163,7 @@ void server::add(sockaddr_in& ra, uint64_t cmd_seq, uint64_t fsize, const std::s
     tcp.bind();
     tcp.listen();
     tcp.set_timeout({timeout, 0});
+    std::cout << "opened port: " << tcp.port() << std::endl;
     cmd::complex complex(cmd::can_add, cmd_seq, tcp.port());
     udp.send(complex, ra);
 
