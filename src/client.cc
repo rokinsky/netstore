@@ -19,6 +19,7 @@
 #include <boost/bind.hpp>
 #include <boost/exception/diagnostic_information.hpp>
 #include <csignal>
+#include <thread>
 
 #include "common.hh"
 #include "sockets.hh"
@@ -40,12 +41,11 @@ class client {
 
    void connect(sockets::udp& sock);
    void run();
+   static sockaddr_in set_target(const std::string& addr, in_port_t port);
 
  private:
   /* <available memory, multicast address, unicast address> */
   typedef std::tuple<uint64_t, std::string, std::string> mmu_t;
-
-  static sockaddr_in set_target(const std::string& addr, in_port_t port);
 
   std::vector<mmu_t> discover(sockets::udp& sock);
 
@@ -137,6 +137,33 @@ void client::search(const std::string& pattern) {
   });
 }
 
+void th_fetch(const std::string& param, const std::string& addr, const std::string& out_fldr, in_port_t cmd_port) {
+  auto server_address = client::set_target(addr, cmd_port);
+  cmd::simple simple { cmd::get, 1, param.data() };
+  sockets::udp udp_msg(0);
+  udp_msg.send(simple, server_address);
+
+  cmd::complex complex;
+  udp_msg.set_timeout();
+  sockaddr_in receive_address{};
+  ssize_t rcv_len = udp_msg.recv(complex, receive_address);
+
+  if (rcv_len >= 0 && cmd::validate(complex, simple, cmd::connect_me)) {
+    try {
+      sockets::tcp tcp;
+      tcp.connect(addr, complex.param());
+      tcp.download(aux::path(out_fldr, complex.data));
+      msg::downloaded(param, inet_ntoa(receive_address.sin_addr),
+                      complex.param());
+    } catch (const std::exception& e) {
+      msg::downloading_failed(param, inet_ntoa(receive_address.sin_addr),
+                              complex.param(), e.what());
+    }
+  } else {
+    msg::downloading_failed(param, "", 0, "");
+  }
+}
+
 void client::fetch(const std::string& param) {
   std::string addr;
   {
@@ -149,29 +176,10 @@ void client::fetch(const std::string& param) {
     return;
   }
 
-  auto server_address = set_target(addr, cmd_port);
-  cmd::simple simple { cmd::get, cmd_seq(), param.data() };
-  udp.send(simple, server_address);
-
-  cmd::complex complex;
-  udp.set_timeout();
-  sockaddr_in receive_address{};
-  ssize_t rcv_len = udp.recv(complex, receive_address);
-
-  if (rcv_len >= 0 && cmd::validate(complex, simple, cmd::connect_me)) {
-    try {
-      sockets::tcp tcp;
-      tcp.connect(files[param], complex.param());
-      tcp.download(aux::path(out_fldr, complex.data));
-      msg::downloaded(param, inet_ntoa(receive_address.sin_addr),
-          complex.param());
-    } catch (const std::exception& e) {
-      msg::downloading_failed(param, inet_ntoa(receive_address.sin_addr),
-          complex.param(), e.what());
-    }
-  } else {
-    msg::downloading_failed(param, "", 0, "");
-  }
+  std::thread t{[param, addr, out_fldr = this->out_fldr, cmd_port = this->cmd_port] {
+    th_fetch(param, addr, out_fldr, cmd_port);
+  }};
+  t.detach();
 }
 
 void client::upload(const std::string& param) {
